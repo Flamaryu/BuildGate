@@ -562,6 +562,22 @@ class QaOverlayService : Service() {
                         setOnClickListener { verifyCurrentAndLaunchNextApp() }
                     }
                     card.addView(nextBtn)
+                } else if (isReadyForNext && nextQueued == null) {
+                    val finishBtn = Button(this).apply {
+                        text = "✅ Finish Queue & Close Pill"
+                        isAllCaps = false
+                        setTextColor(Color.WHITE)
+                        typeface = Typeface.DEFAULT_BOLD
+                        textSize = 12.5f
+                        background = roundedBg(Color.parseColor("#059669"), Color.parseColor("#34D399"), 12)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = dp(8) }
+                        setOnClickListener { verifyCurrentAndLaunchNextApp() }
+                    }
+                    card.addView(finishBtn)
                 } else if (snap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED && snap.activeApp != null) {
                     val returnTargetBtn = Button(this).apply {
                         text = "▶️ Return to ${appTitle.substringBefore(":")} to Resume"
@@ -607,6 +623,9 @@ class QaOverlayService : Service() {
                 })
                 card.addView(menuButton("✕ Minimize Pill") {
                     switchOverlayMode(OverlayMode.COLLAPSED_PILL)
+                })
+                card.addView(menuButton("🛑 Close QA Pill") {
+                    dismissOverlayCompletely()
                 })
 
                 container.addView(card)
@@ -830,8 +849,15 @@ class QaOverlayService : Service() {
             }
         } else {
             openBuildGateQueueScreen()
-            switchOverlayMode(OverlayMode.COLLAPSED_PILL)
+            dismissOverlayCompletely()
         }
+    }
+
+    private fun dismissOverlayCompletely() {
+        GlobalQaSession.coordinator.stopSession()
+        tearDownOverlayAndProjection()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun formatCollapsedText(snap: ActiveQaSessionState): String {
@@ -924,6 +950,13 @@ class QaOverlayService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val stopPending = PendingIntent.getService(
+            this,
+            104,
+            Intent(this, QaOverlayService::class.java).apply { action = ACTION_STOP_SERVICE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentTitle("BuildGate QA • $appTitle")
@@ -933,6 +966,8 @@ class QaOverlayService : Service() {
             .setContentIntent(openQueuePending)
         if (isReadyForNext) {
             builder.addAction(0, "Verify & Next App ➔", nextPending)
+        } else if (snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED) {
+            builder.addAction(0, "Close Pill", stopPending)
         }
         return builder
             .addAction(
