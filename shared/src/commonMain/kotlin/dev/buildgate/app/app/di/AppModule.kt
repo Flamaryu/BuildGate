@@ -10,6 +10,7 @@ import dev.buildgate.app.entities.feedbackitem.repository.DemoFeedbackRepository
 import dev.buildgate.app.entities.feedbackitem.repository.FeedbackRepository
 import dev.buildgate.app.features.auth.AuthViewModel
 import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
+import dev.buildgate.app.features.publishapp.PublishAppViewModel
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
 import dev.buildgate.app.features.verifysession.VerifySessionViewModel
@@ -58,4 +59,5 @@ val appModule = module {
     viewModelOf(::SubmitFeedbackViewModel)
     viewModelOf(::TriageFeedbackViewModel)
     viewModelOf(::ManageMissionsViewModel)
+    viewModelOf(::PublishAppViewModel)
 }

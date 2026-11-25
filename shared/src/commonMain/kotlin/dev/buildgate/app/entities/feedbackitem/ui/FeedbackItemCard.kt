@@ -49,9 +49,24 @@ fun FeedbackItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Category Tag
-                CategoryTag(category = item.category)
-                // Status Tag
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CategoryTag(category = item.category)
+                    if (item.bountyAwarded) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "+25⚡ Bounty",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
                 StatusTag(status = item.status)
             }
 
@@ -69,13 +84,25 @@ fun FeedbackItemCard(
                 maxLines = 3
             )
 
+            if (!item.screenshotUrl.isNullOrBlank() || !item.videoClipUrl.isNullOrBlank()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!item.screenshotUrl.isNullOrBlank()) {
+                        MediaBadge(label = "📸 Screenshot Attached")
+                    }
+                    if (!item.videoClipUrl.isNullOrBlank()) {
+                        val secs = ((item.mediaDurationMs ?: 15000) / 1000).coerceAtLeast(1)
+                        MediaBadge(label = "🎥 ${secs}s Screen Clip Attached")
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${item.deviceMetadata.model} • ${item.buildVersion}",
+                    text = "@${item.authorUsername} • ${item.deviceMetadata.model} • ${item.buildVersion}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -96,6 +123,23 @@ fun FeedbackItemCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MediaBadge(label: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
     }
 }
 

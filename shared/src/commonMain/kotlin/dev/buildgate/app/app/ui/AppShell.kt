@@ -38,12 +38,15 @@ import dev.buildgate.app.entities.feedbackitem.repository.FeedbackRepository
 import dev.buildgate.app.shared.session.QaMediaCaptureBus
 import dev.buildgate.app.features.auth.AuthViewModel
 import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
+import dev.buildgate.app.features.publishapp.PublishAppViewModel
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
 import dev.buildgate.app.features.verifysession.VerifySessionViewModel
 import dev.buildgate.app.pages.account.AccountPage
 import dev.buildgate.app.pages.dailyqueue.DailyQueuePage
 import dev.buildgate.app.pages.discovery.DiscoveryPage
+import dev.buildgate.app.pages.packet.ProductionPacketPage
+import dev.buildgate.app.pages.publish.PublishAppPage
 import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
 import dev.buildgate.app.shared.theme.BuildGateTheme
@@ -63,6 +66,7 @@ fun AppShell() {
             val triageViewModel: TriageFeedbackViewModel = koinViewModel()
             val submitViewModel: SubmitFeedbackViewModel = koinViewModel()
             val missionsViewModel: ManageMissionsViewModel = koinViewModel()
+            val publishAppViewModel: PublishAppViewModel = koinViewModel()
 
             val appListingRepo: AppListingRepository = koinInject()
             val enrollmentRepo: EnrollmentRepository = koinInject()
@@ -245,27 +249,26 @@ fun AppShell() {
                         }
 
                         composable<BuildGateRoute.PublishApp> {
-                            DiscoveryPage(
-                                appListingRepository = appListingRepo,
-                                enrollmentRepository = enrollmentRepo,
-                                authSession = authSession,
-                                onOpenCampaign = { navigateTo(BuildGateRoute.AppCampaign(it)) },
-                                onOpenDailyQueue = { navigateTo(BuildGateRoute.DailyQueue) },
-                                onOpenPublishWizard = {},
-                                onOpenAccount = { navigateTo(BuildGateRoute.Account) }
+                            PublishAppPage(
+                                ownerId = currentUserId,
+                                ownerKarma = authSession.profile?.karmaPoints ?: 50,
+                                viewModel = publishAppViewModel,
+                                onPublished = { publishedPkg ->
+                                    navigateTo(BuildGateRoute.AppCampaign(publishedPkg))
+                                }
                             )
                         }
 
                         composable<BuildGateRoute.ProductionPacket> { backStackEntry ->
                             val route: BuildGateRoute.ProductionPacket = backStackEntry.toRoute()
-                            TriageBoardPage(
+                            ProductionPacketPage(
                                 appId = route.appId,
-                                triageViewModel = triageViewModel,
-                                submitViewModel = submitViewModel,
-                                missionsViewModel = missionsViewModel,
-                                testerId = currentUserId,
-                                testerUsername = currentUsername,
-                                onOpenProductionPacket = {}
+                                appListingRepository = appListingRepo,
+                                enrollmentRepository = enrollmentRepo,
+                                feedbackRepository = feedbackRepo,
+                                onNavigateBack = {
+                                    navigateTo(BuildGateRoute.TriageBoard(route.appId))
+                                }
                             )
                         }
 

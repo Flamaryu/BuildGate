@@ -14,8 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -23,25 +26,33 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.buildgate.app.entities.feedbackitem.model.FeedbackCategory
+import dev.buildgate.app.entities.feedbackitem.model.FeedbackItem
+import dev.buildgate.app.entities.feedbackitem.model.FeedbackStatus
 import dev.buildgate.app.entities.feedbackitem.ui.FeedbackItemCard
 import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
+import dev.buildgate.app.features.managemissions.MissionUiEvent
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackEvent
+import dev.buildgate.app.features.submitfeedback.SubmitFeedbackUiState
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageUiEvent
+import dev.buildgate.app.shared.platform.PlatformVerifier
 import dev.buildgate.app.widgets.devicetable.DeviceMetadataTable
 import dev.buildgate.app.widgets.kanban.TriageKanbanBoard
 import dev.buildgate.app.widgets.retention.RetentionTracker14Day
+import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +68,9 @@ fun TriageBoardPage(
 ) {
     val triageState by triageViewModel.uiState.collectAsState()
     val submitState by submitViewModel.uiState.collectAsState()
+    val missionState by missionsViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val platformVerifier: PlatformVerifier = koinInject()
 
     LaunchedEffect(appId) {
         triageViewModel.selectApp(appId)
@@ -86,6 +99,14 @@ fun TriageBoardPage(
         }
     }
 
+    LaunchedEffect(Unit) {
+        missionsViewModel.eventFlow.collect { event ->
+            when (event) {
+                is MissionUiEvent.ShowMessage -> snackbarHostState.showSnackbar(event.msg)
+            }
+        }
+    }
+
     val currentApp = triageState.selectedApp
     val bestStreak = triageState.enrollmentsForApp.maxOfOrNull { it.currentStreak } ?: 0
 
@@ -95,7 +116,7 @@ fun TriageBoardPage(
                 title = {
                     Column {
                         Text(
-                            text = "Triage & QA Hub",
+                            text = "Triage, Missions & QA Hub",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -147,6 +168,15 @@ fun TriageBoardPage(
                             onSelectApp = { triageViewModel.selectApp(it) }
                         )
 
+                        triageState.selectedItem?.let { sel ->
+                            SelectedFeedbackDetailCard(
+                                item = sel,
+                                onOpenMediaUrl = { platformVerifier.openExternalUrl(it) },
+                                onStatusChange = { status -> triageViewModel.updateStatus(sel.id, status) },
+                                onClose = { triageViewModel.selectItem(null) }
+                            )
+                        }
+
                         TriageKanbanBoard(
                             items = triageState.items,
                             onStatusChange = { id, status -> triageViewModel.updateStatus(id, status) },
@@ -167,18 +197,20 @@ fun TriageBoardPage(
                             testerName = "${triageState.enrollmentsForApp.size} Enrolled Testers"
                         )
 
-                        FeedbackComposerSection(
-                            submitViewModel = submitViewModel,
-                            submitTitle = submitState.title,
-                            submitDescription = submitState.description,
-                            selectedCategory = submitState.category,
-                            specsSummary = submitState.capturedSpecs?.let { "${it.model} (${it.screenResolution})" },
-                            onSubmit = { submitViewModel.submit(testerId, testerUsername) }
+                        MissionComposerCard(
+                            missionTitle = missionState.newTitle,
+                            missionInstructions = missionState.newInstructions,
+                            existingCount = missionState.missions.size,
+                            onTitleChange = { missionsViewModel.onTitleChanged(it) },
+                            onInstructionsChange = { missionsViewModel.onInstructionsChanged(it) },
+                            onPublishMission = { missionsViewModel.addMission() }
                         )
 
-                        submitState.capturedSpecs?.let { specs ->
-                            DeviceMetadataTable(metadata = specs)
-                        }
+                        FeedbackComposerSection(
+                            submitViewModel = submitViewModel,
+                            submitState = submitState,
+                            onSubmit = { submitViewModel.submit(testerId, testerUsername) }
+                        )
                     }
                 }
             } else {
@@ -197,17 +229,36 @@ fun TriageBoardPage(
                     item {
                         FeedbackComposerSection(
                             submitViewModel = submitViewModel,
-                            submitTitle = submitState.title,
-                            submitDescription = submitState.description,
-                            selectedCategory = submitState.category,
-                            specsSummary = submitState.capturedSpecs?.let { "${it.model} (${it.screenResolution})" },
+                            submitState = submitState,
                             onSubmit = { submitViewModel.submit(testerId, testerUsername) }
                         )
                     }
 
                     item {
+                        MissionComposerCard(
+                            missionTitle = missionState.newTitle,
+                            missionInstructions = missionState.newInstructions,
+                            existingCount = missionState.missions.size,
+                            onTitleChange = { missionsViewModel.onTitleChanged(it) },
+                            onInstructionsChange = { missionsViewModel.onInstructionsChanged(it) },
+                            onPublishMission = { missionsViewModel.addMission() }
+                        )
+                    }
+
+                    triageState.selectedItem?.let { sel ->
+                        item {
+                            SelectedFeedbackDetailCard(
+                                item = sel,
+                                onOpenMediaUrl = { platformVerifier.openExternalUrl(it) },
+                                onStatusChange = { status -> triageViewModel.updateStatus(sel.id, status) },
+                                onClose = { triageViewModel.selectItem(null) }
+                            )
+                        }
+                    }
+
+                    item {
                         Text(
-                            text = "Triage Feed (${triageState.items.size} Reports)",
+                            text = "Triage Feed (${triageState.items.size} Reports — Tap Card to Inspect & Triage)",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -249,63 +300,205 @@ private fun AppSwitcherStrip(
 }
 
 @Composable
-private fun FeedbackComposerSection(
-    submitViewModel: SubmitFeedbackViewModel,
-    submitTitle: String,
-    submitDescription: String,
-    selectedCategory: FeedbackCategory,
-    specsSummary: String?,
-    onSubmit: () -> Unit
+private fun SelectedFeedbackDetailCard(
+    item: FeedbackItem,
+    onOpenMediaUrl: (String) -> Unit,
+    onStatusChange: (FeedbackStatus) -> Unit,
+    onClose: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = "Log Bug or UX Friction",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FeedbackCategory.entries.forEach { cat ->
-                FilterChip(
-                    selected = selectedCategory == cat,
-                    onClick = { submitViewModel.onCategoryChanged(cat) },
-                    label = { Text(cat.name.replace("_", " ")) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Inspecting: ${item.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
+                TextButton(onClick = onClose) { Text("Close ✕") }
+            }
+
+            Text(text = item.description, style = MaterialTheme.typography.bodyMedium)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item.screenshotUrl?.let { url ->
+                    OutlinedButton(onClick = { onOpenMediaUrl(url) }, shape = RoundedCornerShape(10.dp)) {
+                        Text("📸 Open Screenshot")
+                    }
+                }
+                item.videoClipUrl?.let { url ->
+                    OutlinedButton(onClick = { onOpenMediaUrl(url) }, shape = RoundedCornerShape(10.dp)) {
+                        Text("🎥 Play Screen Clip")
+                    }
+                }
+            }
+
+            DeviceMetadataTable(metadata = item.deviceMetadata)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FeedbackStatus.entries.forEach { st ->
+                    FilterChip(
+                        selected = item.status == st,
+                        onClick = { onStatusChange(st) },
+                        label = { Text(st.name) }
+                    )
+                }
             }
         }
+    }
+}
 
-        OutlinedTextField(
-            value = submitTitle,
-            onValueChange = { submitViewModel.onTitleChanged(it) },
-            label = { Text("Issue Title") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        OutlinedTextField(
-            value = submitDescription,
-            onValueChange = { submitViewModel.onDescriptionChanged(it) },
-            label = { Text("Reproduction Steps / Expected vs Actual") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        specsSummary?.let { summary ->
-            Text(
-                text = "📱 Auto-attached Specs: $summary",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        Button(
-            onClick = onSubmit,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+@Composable
+private fun MissionComposerCard(
+    missionTitle: String,
+    missionInstructions: String,
+    existingCount: Int,
+    onTitleChange: (String) -> Unit,
+    onInstructionsChange: (String) -> Unit,
+    onPublishMission: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Submit Report with Hardware Specs")
+            Text(
+                text = "🎯 Developer Build Missions ($existingCount Active)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            OutlinedTextField(
+                value = missionTitle,
+                onValueChange = onTitleChange,
+                label = { Text("New QA Mission Title") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedTextField(
+                value = missionInstructions,
+                onValueChange = onInstructionsChange,
+                label = { Text("Instructions for Testers") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedButton(
+                onClick = onPublishMission,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("+ Add Build Mission")
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedbackComposerSection(
+    submitViewModel: SubmitFeedbackViewModel,
+    submitState: SubmitFeedbackUiState,
+    onSubmit: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Log Bug or UX Friction (+25⚡ Bounty When Triaged)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FeedbackCategory.entries.forEach { cat ->
+                    FilterChip(
+                        selected = submitState.category == cat,
+                        onClick = { submitViewModel.onCategoryChanged(cat) },
+                        label = { Text(cat.name.replace("_", " ")) }
+                    )
+                }
+            }
+
+            if (submitState.attachedScreenshotBytes != null || submitState.attachedVideoBytes != null) {
+                HorizontalDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (submitState.attachedScreenshotBytes != null) {
+                            "📸 Overlay Screenshot Ready (${submitState.attachedScreenshotBytes.size / 1024} KB)"
+                        } else {
+                            "🎥 Overlay ${(submitState.attachedMediaDurationMs ?: 5000) / 1000}s Clip Ready"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    TextButton(onClick = { submitViewModel.clearAttachments() }) {
+                        Text("Remove")
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = submitState.title,
+                onValueChange = { submitViewModel.onTitleChanged(it) },
+                label = { Text("Issue Title") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            OutlinedTextField(
+                value = submitState.description,
+                onValueChange = { submitViewModel.onDescriptionChanged(it) },
+                label = { Text("Reproduction Steps / Expected vs Actual") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            submitState.capturedSpecs?.let { specs ->
+                Text(
+                    text = "📱 Auto-attached Specs: ${specs.model} (${specs.screenResolution})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Button(
+                onClick = onSubmit,
+                enabled = !submitState.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (submitState.isSubmitting) "Uploading..." else "Submit Report with Hardware Specs")
+            }
         }
     }
 }
