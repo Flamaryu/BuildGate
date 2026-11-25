@@ -14,6 +14,15 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class DeepLinkSnippetLanguage(val label: String) {
+    KOTLIN("Kotlin"),
+    JAVA("Java"),
+    FLUTTER("Flutter"),
+    REACT_NATIVE("React Native"),
+    UNITY("Unity C#"),
+    GODOT("Godot")
+}
+
 data class PublishAppUiState(
     val title: String = "",
     val packageName: String = "",
@@ -24,32 +33,136 @@ data class PublishAppUiState(
     val targetTesters: String = "16",
     val category: String = "Productivity",
     val deepLinkScheme: String = "",
+    val selectedSnippetLanguage: DeepLinkSnippetLanguage = DeepLinkSnippetLanguage.KOTLIN,
     val initialMissionTitle: String = "",
     val initialMissionInstructions: String = "",
     val isSubmitting: Boolean = false
 ) {
-    val generatedKotlinSnippet: String
-        get() {
-            val scheme = deepLinkScheme.trim().ifBlank { "myapp" }
-            val pkg = packageName.trim().ifBlank { "com.yourcompany.app" }
-            return """
+    val generatedSnippet: String
+        get() = snippetFor(selectedSnippetLanguage)
+
+    fun snippetFor(language: DeepLinkSnippetLanguage): String {
+        val scheme = deepLinkScheme.trim().ifBlank { "myapp" }
+        val pkg = packageName.trim().ifBlank { "com.yourcompany.app" }
+        val endpoint = "https://<PROJECT>.supabase.co/functions/v1/verify-deeplink-heartbeat"
+        return when (language) {
+            DeepLinkSnippetLanguage.KOTLIN -> """
 // 1. AndroidManifest.xml (inside MainActivity):
 // <data android:scheme="$scheme" android:host="buildgate-verify" />
 
-// 2. MainActivity.onCreate / onNewIntent (10-line Tier-2 Proof):
+// 2. MainActivity.onCreate / onNewIntent (Kotlin):
 intent?.data?.takeIf { it.scheme == "$scheme" && it.host == "buildgate-verify" }?.let { uri ->
     val nonce = uri.getQueryParameter("nonce") ?: return@let
     lifecycleScope.launch(Dispatchers.IO) {
-        URL("https://<PROJECT>.supabase.co/functions/v1/verify-deeplink-heartbeat")
-            .openConnection().apply {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                outputStream.write("{\"nonce\":\"${'$'}nonce\",\"package_name\":\"$pkg\"}".toByteArray())
-            }.inputStream.close()
+        (URL("$endpoint").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            outputStream.write("{\"nonce\":\"${'$'}nonce\",\"package_name\":\"$pkg\"}".toByteArray())
+            inputStream.close()
+        }
     }
 }
             """.trimIndent()
+
+            DeepLinkSnippetLanguage.JAVA -> """
+// 1. AndroidManifest.xml (inside MainActivity):
+// <data android:scheme="$scheme" android:host="buildgate-verify" />
+
+// 2. MainActivity.onCreate / onNewIntent (Java):
+Uri uri = getIntent() != null ? getIntent().getData() : null;
+if (uri != null && "$scheme".equals(uri.getScheme()) && "buildgate-verify".equals(uri.getHost())) {
+    String nonce = uri.getQueryParameter("nonce");
+    if (nonce != null) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL("$endpoint").openConnection();
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.getOutputStream().write(("{\"nonce\":\"" + nonce + "\",\"package_name\":\"$pkg\"}").getBytes());
+                c.getInputStream().close();
+            } catch (Exception ignored) {}
+        });
+    }
+}
+            """.trimIndent()
+
+            DeepLinkSnippetLanguage.FLUTTER -> """
+// 1. android/app/src/main/AndroidManifest.xml (inside MainActivity):
+// <data android:scheme="$scheme" android:host="buildgate-verify" />
+
+// 2. main.dart (using app_links + dart:io HttpClient):
+AppLinks().uriLinkStream.listen((uri) async {
+  if (uri.scheme == '$scheme' && uri.host == 'buildgate-verify') {
+    final nonce = uri.queryParameters['nonce'];
+    if (nonce == null) return;
+    final req = await HttpClient().postUrl(Uri.parse('$endpoint'));
+    req.headers.contentType = ContentType.json;
+    req.write(jsonEncode({'nonce': nonce, 'package_name': '$pkg'}));
+    await (await req.close()).drain();
+  }
+});
+            """.trimIndent()
+
+            DeepLinkSnippetLanguage.REACT_NATIVE -> """
+// 1. AndroidManifest.xml (or Expo app.json "scheme": "$scheme"):
+// <data android:scheme="$scheme" android:host="buildgate-verify" />
+
+// 2. App.tsx (React Native / Expo):
+import { Linking } from 'react-native';
+
+const handleUrl = ({ url }: { url: string }) => {
+  if (!url.startsWith('$scheme://buildgate-verify')) return;
+  const nonce = new URL(url).searchParams.get('nonce');
+  if (!nonce) return;
+  fetch('$endpoint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nonce, package_name: '$pkg' }),
+  });
+};
+Linking.getInitialURL().then(url => url && handleUrl({ url }));
+Linking.addEventListener('url', handleUrl);
+            """.trimIndent()
+
+            DeepLinkSnippetLanguage.UNITY -> """
+// 1. Plugins/Android/AndroidManifest.xml (inside UnityPlayerActivity):
+// <data android:scheme="$scheme" android:host="buildgate-verify" />
+
+// 2. BuildGateVerifier.cs (Unity C#):
+void Awake() {
+    Application.deepLinkActivated += OnDeepLink;
+    if (!string.IsNullOrEmpty(Application.absoluteURL)) OnDeepLink(Application.absoluteURL);
+}
+void OnDeepLink(string url) {
+    if (!url.StartsWith("$scheme://buildgate-verify")) return;
+    var nonce = new Uri(url).Query.Split("nonce=")[1].Split('&')[0];
+    StartCoroutine(PostHeartbeat(nonce));
+}
+IEnumerator PostHeartbeat(string nonce) {
+    var json = $"{{\"nonce\":\"{nonce}\",\"package_name\":\"$pkg\"}}";
+    using var req = UnityWebRequest.Post("$endpoint", json, "application/json");
+    yield return req.SendWebRequest();
+}
+            """.trimIndent()
+
+            DeepLinkSnippetLanguage.GODOT -> """
+# 1. Android export / AndroidManifest.xml (inside GodotApp activity):
+# <data android:scheme="$scheme" android:host="buildgate-verify" />
+
+# 2. buildgate_verify.gd (Godot 4 GDScript):
+func _ready() -> void:
+    for arg in OS.get_cmdline_args():
+        if arg.begins_with("$scheme://buildgate-verify"):
+            var nonce = arg.get_slice("nonce=", 1).get_slice("&", 0)
+            var http = HTTPRequest.new()
+            add_child(http)
+            var body = JSON.stringify({"nonce": nonce, "package_name": "$pkg"})
+            http.request("$endpoint", ["Content-Type: application/json"], HTTPClient.METHOD_POST, body)
+            """.trimIndent()
         }
+    }
 }
 
 sealed interface PublishAppEvent {
@@ -88,6 +201,7 @@ class PublishAppViewModel(
     fun onTargetTestersChanged(v: String) { _uiState.update { it.copy(targetTesters = v) } }
     fun onCategoryChanged(v: String) { _uiState.update { it.copy(category = v) } }
     fun onDeepLinkSchemeChanged(v: String) { _uiState.update { it.copy(deepLinkScheme = v.lowercase().trim()) } }
+    fun onSnippetLanguageSelected(lang: DeepLinkSnippetLanguage) { _uiState.update { it.copy(selectedSnippetLanguage = lang) } }
     fun onInitialMissionTitleChanged(v: String) { _uiState.update { it.copy(initialMissionTitle = v) } }
     fun onInitialMissionInstructionsChanged(v: String) { _uiState.update { it.copy(initialMissionInstructions = v) } }
 

@@ -271,6 +271,20 @@ class BuildGateCoreTest {
         assertTrue(matrix.get(matrix.size - 8, 8))
     }
 
+    @Test
+    fun publishAppUiState_generatesValidSnippetsForAllSupportedAndroidStacks() {
+        val state = dev.buildgate.app.features.publishapp.PublishAppUiState(
+            packageName = "com.mkdinteractive.shatterhorde",
+            deepLinkScheme = "shatterhorde"
+        )
+        dev.buildgate.app.features.publishapp.DeepLinkSnippetLanguage.entries.forEach { lang ->
+            val snippet = state.snippetFor(lang)
+            assertTrue(snippet.contains("shatterhorde"), "Missing scheme in $lang snippet")
+            assertTrue(snippet.contains("com.mkdinteractive.shatterhorde"), "Missing package in $lang snippet")
+            assertTrue(snippet.contains("verify-deeplink-heartbeat"), "Missing endpoint in $lang snippet")
+        }
+    }
+
     private fun sampleApp(id: String, pkg: String) = AppListing(
         id = id,
         ownerId = "owner_1",

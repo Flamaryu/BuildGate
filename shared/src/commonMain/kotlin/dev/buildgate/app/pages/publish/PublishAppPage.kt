@@ -10,11 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.buildgate.app.features.publishapp.DeepLinkSnippetLanguage
 import dev.buildgate.app.features.publishapp.PublishAppEvent
 import dev.buildgate.app.features.publishapp.PublishAppViewModel
 import dev.buildgate.app.shared.platform.PlatformVerifier
@@ -248,6 +252,21 @@ fun PublishAppPage(
 
                         HorizontalDivider()
 
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DeepLinkSnippetLanguage.entries.forEach { lang ->
+                                FilterChip(
+                                    selected = state.selectedSnippetLanguage == lang,
+                                    onClick = { viewModel.onSnippetLanguageSelected(lang) },
+                                    label = { Text(lang.label) }
+                                )
+                            }
+                        }
+
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -256,7 +275,7 @@ fun PublishAppPage(
                                 .padding(12.dp)
                         ) {
                             Text(
-                                text = state.generatedKotlinSnippet,
+                                text = state.generatedSnippet,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -265,12 +284,13 @@ fun PublishAppPage(
 
                         OutlinedButton(
                             onClick = {
-                                platformVerifier.copyToClipboard("Deep-Link Snippet", state.generatedKotlinSnippet)
-                                scope.launch { snackbarHostState.showSnackbar("Copied 10-line Kotlin Deep-Link snippet!") }
+                                val langLabel = state.selectedSnippetLanguage.label
+                                platformVerifier.copyToClipboard("$langLabel Deep-Link Snippet", state.generatedSnippet)
+                                scope.launch { snackbarHostState.showSnackbar("Copied $langLabel Deep-Link snippet!") }
                             },
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Copy 10-Line Kotlin Handshake Snippet")
+                            Text("Copy ${state.selectedSnippetLanguage.label} Handshake Snippet")
                         }
 
                         Button(
