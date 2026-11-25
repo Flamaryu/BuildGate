@@ -16,6 +16,7 @@ import dev.buildgate.app.features.verifysession.VerifySessionViewModel
 import dev.buildgate.app.shared.network.SupabaseConfig
 import dev.buildgate.app.shared.network.createBuildGateHttpClient
 import dev.buildgate.app.shared.platform.getPlatformVerifier
+import dev.buildgate.app.shared.session.GlobalQaSession
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.bind
@@ -23,12 +24,13 @@ import org.koin.dsl.module
 
 val appModule = module {
 
-    // Network & Platform
+    // Network, Platform & Active QA Session Coordinator
     single { SupabaseConfig() }
     single { createBuildGateHttpClient(get()) }
     single { getPlatformVerifier() }
+    single { GlobalQaSession.coordinator }
 
-    // Reactive Repositories (Demo fallback until Hosted Supabase keys are provided)
+    // Reactive Repositories
     singleOf(::DemoAppListingRepository) bind AppListingRepository::class
     singleOf(::DemoEnrollmentRepository) bind EnrollmentRepository::class
     singleOf(::DemoFeedbackRepository) bind FeedbackRepository::class

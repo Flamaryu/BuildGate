@@ -1,23 +1,55 @@
+@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+
 package dev.buildgate.app.shared.platform
 
+import kotlinx.datetime.Clock
+
+@JsFun("(url) => { window.open(url, '_blank', 'noopener,noreferrer'); }")
+private external fun wasmOpenExternalUrl(url: String)
+
+@JsFun("(text) => { if (navigator.clipboard) { navigator.clipboard.writeText(text); } }")
+private external fun wasmCopyText(text: String)
+
+@JsFun("() => window.innerWidth || 1920")
+private external fun wasmInnerWidth(): Int
+
+@JsFun("() => window.innerHeight || 1080")
+private external fun wasmInnerHeight(): Int
+
 class WasmJsPlatformVerifier : PlatformVerifier {
-    override fun isAppInstalled(packageName: String): Boolean {
-        // Safe Web stub for package verification
-        return true
+    override val supportsDeviceVerification: Boolean = false
+    override val supportsFloatingOverlay: Boolean = false
+
+    override fun inspectInstalledApp(packageName: String): InstalledPackageInfo =
+        InstalledPackageInfo(isInstalled = false)
+
+    override fun launchTargetApp(
+        packageName: String,
+        sessionToken: String,
+        deepLinkScheme: String?
+    ): Boolean = false
+
+    override fun openExternalUrl(url: String) {
+        if (url.isNotBlank()) {
+            wasmOpenExternalUrl(url)
+        }
     }
 
-    override fun launchTargetApp(packageName: String, sessionToken: String): Boolean {
-        // Safe Web stub: simulate launching Play Store web link or deep link
-        return true
+    override fun copyToClipboard(label: String, text: String) {
+        wasmCopyText(text)
     }
+
+    override fun monotonicElapsedMs(): Long = Clock.System.now().toEpochMilliseconds()
 
     override fun captureDeviceMetadata(): DeviceMetadata {
+        val w = wasmInnerWidth()
+        val h = wasmInnerHeight()
         return DeviceMetadata(
-            model = "Web Browser (WasmJS / Chrome Engine)",
-            osVersion = "Web Assembly OS Driver",
-            screenResolution = "1920x1080 (Desktop Wide)",
-            aspectRatio = "16:9",
-            platformName = "Compose Web Dashboard"
+            model = "Web Browser (WasmJS Companion)",
+            osVersion = "WebAssembly Runtime",
+            screenResolution = "${w}x${h}",
+            aspectRatio = "Desktop/Web",
+            platformName = "BuildGate Web Command Center"
         )
     }
 }

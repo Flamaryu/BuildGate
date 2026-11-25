@@ -11,7 +11,11 @@ import dev.buildgate.app.entities.enrollment.model.Enrollment
 import dev.buildgate.app.entities.enrollment.repository.EnrollmentRepository
 import dev.buildgate.app.entities.testerprofile.model.KarmaReason
 import dev.buildgate.app.entities.testmission.model.TestMission
+import dev.buildgate.app.shared.platform.InstalledPackageInfo
 import dev.buildgate.app.shared.platform.PlatformVerifier
+import dev.buildgate.app.shared.session.GlobalQaSession
+import dev.buildgate.app.shared.session.QaSessionCoordinator
+import dev.buildgate.app.shared.session.QaSessionPhase
 import dev.buildgate.app.shared.time.BuildGateClock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -26,6 +30,7 @@ import kotlinx.coroutines.launch
 
 data class SessionUiState(
     val selectedApp: AppListing? = null,
+    val packageInfo: InstalledPackageInfo = InstalledPackageInfo(isInstalled = false),
     val isInstalled: Boolean = false,
     val enrollment: Enrollment? = null,
     val missions: List<TestMission> = emptyList(),
@@ -34,7 +39,8 @@ data class SessionUiState(
     val secondsRemaining: Int = 60,
     val sessionToken: String = "",
     val isVerifiedToday: Boolean = false,
-    val supportsDeviceVerification: Boolean = true
+    val supportsDeviceVerification: Boolean = true,
+    val canDrawOverlays: Boolean = false
 )
 
 sealed interface SessionUiEvent {
@@ -46,18 +52,39 @@ class VerifySessionViewModel(
     private val appListingRepository: AppListingRepository,
     private val enrollmentRepository: EnrollmentRepository,
     private val authRepository: AuthRepository,
-    private val platformVerifier: PlatformVerifier
+    private val platformVerifier: PlatformVerifier,
+    private val sessionCoordinator: QaSessionCoordinator
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SessionUiState())
+    private val _uiState = MutableStateFlow(
+        SessionUiState(
+            supportsDeviceVerification = platformVerifier.supportsDeviceVerification,
+            canDrawOverlays = platformVerifier.canDrawOverlays()
+        )
+    )
     val uiState: StateFlow<SessionUiState> = _uiState.asStateFlow()
 
     private val _eventChannel = Channel<SessionUiEvent>(Channel.BUFFERED)
     val eventFlow = _eventChannel.receiveAsFlow()
 
-    private var timerJob: Job? = null
+    private var tickerJob: Job? = null
     private var observerJob: Job? = null
     private var activeTesterId: String = "tester_1"
+
+    init {
+        // Auto-refresh package installation & timer whenever host activity resumes
+        viewModelScope.launch {
+            GlobalQaSession.resumeTick.collect {
+                refreshInstallStatus()
+                val snap = sessionCoordinator.evaluateProgress()
+                if (snap.phase == QaSessionPhase.READY_TO_VERIFY &&
+                    snap.activeApp?.id == _uiState.value.selectedApp?.id
+                ) {
+                    verifyDailySession(method = VerificationMethod.ZERO_SDK_SESSION)
+                }
+            }
+        }
+    }
 
     fun loadSessionForApp(appIdOrPackage: String, testerId: String) {
         activeTesterId = testerId
@@ -65,116 +92,182 @@ class VerifySessionViewModel(
         observerJob = viewModelScope.launch {
             val resolved = appListingRepository.getListingById(appIdOrPackage)
             if (resolved == null) {
-                _uiState.value = SessionUiState()
+                _uiState.value = SessionUiState(
+                    supportsDeviceVerification = platformVerifier.supportsDeviceVerification,
+                    canDrawOverlays = platformVerifier.canDrawOverlays()
+                )
                 return@launch
             }
-            val isInst = platformVerifier.isAppInstalled(resolved.packageName)
+            val pkgInfo = platformVerifier.inspectInstalledApp(resolved.packageName)
             enrollmentRepository.enrollInApp(resolved.id, testerId)
-            enrollmentRepository.syncInstallStatus(resolved.id, testerId, isInst)
+            if (platformVerifier.supportsDeviceVerification) {
+                enrollmentRepository.syncInstallStatus(resolved.id, testerId, pkgInfo.isInstalled, pkgInfo.versionCode)
+            }
 
             combine(
                 appListingRepository.observeListingByIdOrPackage(resolved.id),
                 enrollmentRepository.observeEnrollment(resolved.id, testerId),
-                appListingRepository.getMissionsForApp(resolved.id)
-            ) { app, enrollment, missions ->
-                Triple(app ?: resolved, enrollment, missions)
-            }.collect { (app, enrollment, missions) ->
+                appListingRepository.getMissionsForApp(resolved.id),
+                sessionCoordinator.state
+            ) { app, enrollment, missions, coordState ->
+                val actualApp = app ?: resolved
+                val currentPkg = platformVerifier.inspectInstalledApp(actualApp.packageName)
                 val verifiedToday = enrollment?.lastVerifiedUtcDate == BuildGateClock.todayUtcDate()
-                _uiState.update { prev ->
-                    prev.copy(
-                        selectedApp = app,
-                        isInstalled = platformVerifier.isAppInstalled(app.packageName),
-                        enrollment = enrollment,
-                        missions = missions,
-                        sessionToken = prev.sessionToken.ifBlank { "bg_sess_${(100000..999999).random()}" },
-                        isVerifiedToday = verifiedToday
-                    )
+                val isActiveForThisApp = coordState.activeApp?.id == actualApp.id &&
+                    (coordState.phase == QaSessionPhase.RUNNING_IN_TARGET_APP ||
+                     coordState.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK)
+                val remSec = if (isActiveForThisApp) {
+                    coordState.secondsRemaining(platformVerifier.monotonicElapsedMs())
+                } else {
+                    60
                 }
+
+                SessionUiState(
+                    selectedApp = actualApp,
+                    packageInfo = currentPkg,
+                    isInstalled = currentPkg.isInstalled,
+                    enrollment = enrollment,
+                    missions = missions,
+                    isSessionRunning = isActiveForThisApp,
+                    isSessionPaused = coordState.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK,
+                    secondsRemaining = remSec,
+                    sessionToken = coordState.sessionToken.ifBlank {
+                        _uiState.value.sessionToken.ifBlank { "bg_sess_${(100000..999999).random()}" }
+                    },
+                    isVerifiedToday = verifiedToday,
+                    supportsDeviceVerification = platformVerifier.supportsDeviceVerification,
+                    canDrawOverlays = platformVerifier.canDrawOverlays()
+                )
+            }.collect { combined ->
+                _uiState.value = combined
             }
         }
     }
 
     fun refreshInstallStatus() {
         val app = _uiState.value.selectedApp ?: return
-        val installed = platformVerifier.isAppInstalled(app.packageName)
-        _uiState.update { it.copy(isInstalled = installed) }
-        viewModelScope.launch {
-            enrollmentRepository.syncInstallStatus(app.id, activeTesterId, installed)
+        val pkgInfo = platformVerifier.inspectInstalledApp(app.packageName)
+        _uiState.update {
+            it.copy(
+                packageInfo = pkgInfo,
+                isInstalled = pkgInfo.isInstalled,
+                canDrawOverlays = platformVerifier.canDrawOverlays()
+            )
+        }
+        if (platformVerifier.supportsDeviceVerification) {
+            viewModelScope.launch {
+                enrollmentRepository.syncInstallStatus(app.id, activeTesterId, pkgInfo.isInstalled, pkgInfo.versionCode)
+            }
         }
     }
 
-    fun markJoinedGoogleGroup() {
+    fun openGoogleGroupAndMarkJoined() {
         val app = _uiState.value.selectedApp ?: return
+        platformVerifier.openExternalUrl(app.googleGroupUrl)
         viewModelScope.launch {
             enrollmentRepository.markOnboardingStep(app.id, activeTesterId, joinedGoogleGroup = true)
         }
     }
 
-    fun markAcceptedPlayOptIn() {
+    fun openPlayOptInAndMarkAccepted() {
         val app = _uiState.value.selectedApp ?: return
+        platformVerifier.openExternalUrl(app.playStoreOptInUrl)
         viewModelScope.launch {
             enrollmentRepository.markOnboardingStep(app.id, activeTesterId, acceptedPlayOptIn = true)
         }
     }
 
-    fun pauseSessionForFeedback() {
-        if (_uiState.value.isSessionRunning) {
-            _uiState.update { it.copy(isSessionPaused = true) }
-        }
+    fun markAcceptedPlayOptIn() = openPlayOptInAndMarkAccepted()
+
+    fun requestOverlayPermission() {
+        platformVerifier.requestOverlayPermission()
+    }
+
+    fun pauseSessionForFeedback(reason: String = "Logging QA Bug") {
+        sessionCoordinator.pauseForFeedback(reason)
     }
 
     fun resumeSessionFromFeedback() {
-        if (_uiState.value.isSessionRunning) {
-            _uiState.update { it.copy(isSessionPaused = false) }
-        }
+        sessionCoordinator.resumeFromFeedback()
     }
 
     fun startDailyTestSession() {
         val currentApp = _uiState.value.selectedApp ?: return
-        if (!_uiState.value.isInstalled) {
+        if (!platformVerifier.supportsDeviceVerification) {
+            viewModelScope.launch {
+                _eventChannel.send(
+                    SessionUiEvent.ShowMessage("Daily verification runs on Android devices only — scan or open the deep link on your phone.")
+                )
+            }
+            return
+        }
+        val pkgInfo = platformVerifier.inspectInstalledApp(currentApp.packageName)
+        if (!pkgInfo.isInstalled) {
             viewModelScope.launch {
                 _eventChannel.send(SessionUiEvent.ShowMessage("Install ${currentApp.title} from Google Play first"))
             }
             return
         }
-        val sessionToken = _uiState.value.sessionToken
+        val sessionToken = _uiState.value.sessionToken.ifBlank { "bg_sess_${(100000..999999).random()}" }
+        val enrollment = _uiState.value.enrollment
 
-        val launched = platformVerifier.launchTargetApp(currentApp.packageName, sessionToken)
+        sessionCoordinator.startAppSession(
+            app = currentApp,
+            enrollmentId = enrollment?.id,
+            testerId = activeTesterId,
+            sessionToken = sessionToken,
+            targetDurationMs = 60_000L
+        )
+
+        val launched = platformVerifier.launchTargetApp(
+            packageName = currentApp.packageName,
+            sessionToken = sessionToken,
+            deepLinkScheme = currentApp.deepLinkScheme
+        )
         if (!launched) {
+            sessionCoordinator.stopSession()
             viewModelScope.launch {
-                _eventChannel.send(SessionUiEvent.ShowMessage("Could not launch ${currentApp.packageName}"))
+                _eventChannel.send(SessionUiEvent.ShowMessage("Unable to launch ${currentApp.packageName}"))
             }
             return
         }
 
         viewModelScope.launch {
-            _eventChannel.send(SessionUiEvent.ShowMessage("Launched ${currentApp.title} — testing session active (60s)"))
+            _eventChannel.send(SessionUiEvent.ShowMessage("Testing ${currentApp.title} — QA timer active (60s)"))
         }
 
-        timerJob?.cancel()
-        _uiState.update {
-            it.copy(
-                isSessionRunning = true,
-                isSessionPaused = false,
-                secondsRemaining = 60
-            )
-        }
+        startMonotonicTicker(currentApp.id)
+    }
 
-        timerJob = viewModelScope.launch {
-            while (_uiState.value.secondsRemaining > 0) {
-                delay(1000)
-                if (!_uiState.value.isSessionPaused) {
-                    _uiState.update { it.copy(secondsRemaining = (it.secondsRemaining - 1).coerceAtLeast(0)) }
+    private fun startMonotonicTicker(expectedAppId: String) {
+        tickerJob?.cancel()
+        tickerJob = viewModelScope.launch {
+            while (true) {
+                delay(500)
+                val snap = sessionCoordinator.evaluateProgress()
+                if (snap.activeApp?.id != expectedAppId) break
+                if (snap.phase == QaSessionPhase.RUNNING_IN_TARGET_APP) {
+                    val rem = snap.secondsRemaining(platformVerifier.monotonicElapsedMs())
+                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = false) }
+                } else if (snap.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK) {
+                    val rem = snap.secondsRemaining(platformVerifier.monotonicElapsedMs())
+                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = true) }
+                } else if (snap.phase == QaSessionPhase.READY_TO_VERIFY) {
+                    verifyDailySession(method = VerificationMethod.ZERO_SDK_SESSION)
+                    break
+                } else {
+                    break
                 }
             }
-            verifyDailySession(method = VerificationMethod.ZERO_SDK_SESSION)
         }
     }
 
     fun handleDeepLinkCallbackVerification(callbackToken: String) {
-        val state = _uiState.value
-        if (state.sessionToken.isNotBlank() && state.sessionToken == callbackToken) {
-            timerJob?.cancel()
+        val coordToken = sessionCoordinator.state.value.sessionToken
+        val localToken = _uiState.value.sessionToken
+        if (callbackToken.isNotBlank() && (callbackToken == coordToken || callbackToken == localToken)) {
+            tickerJob?.cancel()
+            sessionCoordinator.markVerified(viaDeepLink = true)
             verifyDailySession(method = VerificationMethod.VERIFIED_DEEPLINK_HANDSHAKE)
         }
     }
@@ -190,19 +283,23 @@ class VerifySessionViewModel(
         val enrollment = state.enrollment ?: return
         val app = state.selectedApp ?: return
 
+        sessionCoordinator.markVerified(viaDeepLink = method == VerificationMethod.VERIFIED_DEEPLINK_HANDSHAKE)
+
         viewModelScope.launch {
             val outcome = enrollmentRepository.recordDailyVerification(
                 enrollmentId = enrollment.id,
                 sessionToken = state.sessionToken,
-                activeDurationSeconds = 60 - state.secondsRemaining.coerceIn(0, 60),
+                activeDurationSeconds = 60,
                 method = method,
-                targetDays = app.targetDays
+                targetDays = app.targetDays,
+                installedVersionCode = state.packageInfo.versionCode
             )
 
             _uiState.update {
                 it.copy(
                     isSessionRunning = false,
                     isSessionPaused = false,
+                    secondsRemaining = 0,
                     isVerifiedToday = true
                 )
             }
