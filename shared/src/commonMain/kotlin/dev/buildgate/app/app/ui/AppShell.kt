@@ -34,6 +34,8 @@ import dev.buildgate.app.app.navigation.syncBrowserRouteHash
 import dev.buildgate.app.entities.applisting.repository.AppListingRepository
 import dev.buildgate.app.entities.auth.repository.AuthRepository
 import dev.buildgate.app.entities.enrollment.repository.EnrollmentRepository
+import dev.buildgate.app.entities.feedbackitem.repository.FeedbackRepository
+import dev.buildgate.app.shared.session.QaMediaCaptureBus
 import dev.buildgate.app.features.auth.AuthViewModel
 import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
@@ -65,12 +67,58 @@ fun AppShell() {
             val appListingRepo: AppListingRepository = koinInject()
             val enrollmentRepo: EnrollmentRepository = koinInject()
             val authRepo: AuthRepository = koinInject()
+            val feedbackRepo: FeedbackRepository = koinInject()
 
             val authSession by authViewModel.sessionState.collectAsState()
             val currentUserId = authSession.user?.id ?: "tester_1"
             val currentUsername = authSession.profile?.username ?: "Tester"
 
             val incomingLink by DeepLinkRouter.incomingLinks.collectAsState()
+            val pendingMediaDraft by QaMediaCaptureBus.pendingDraft.collectAsState()
+
+            // Auto-attach screenshots / 15s clips captured from the Android Floating QA Overlay
+            LaunchedEffect(pendingMediaDraft) {
+                val draft = pendingMediaDraft ?: return@LaunchedEffect
+                submitViewModel.setAppContext(draft.appId, draft.buildVersion, draft.sessionToken)
+                if (draft.screenshotBytes != null) {
+                    submitViewModel.attachScreenshot(
+                        bytes = draft.screenshotBytes,
+                        fileName = draft.screenshotFileName ?: "overlay_shot.webp",
+                        previewUri = draft.localPreviewUri
+                    )
+                } else if (draft.videoClipBytes != null) {
+                    submitViewModel.attachVideoClip(
+                        bytes = draft.videoClipBytes,
+                        durationMs = draft.mediaDurationMs ?: 5000,
+                        fileName = draft.videoFileName ?: "overlay_clip.mp4",
+                        previewUri = draft.localPreviewUri
+                    )
+                }
+                QaMediaCaptureBus.consumeDraft()
+            }
+
+            // Persist inline bug reports submitted directly inside the Floating QA Overlay
+            LaunchedEffect(currentUserId, currentUsername) {
+                QaMediaCaptureBus.overlaySubmissions.collect { sub ->
+                    feedbackRepo.submitFeedback(
+                        appId = sub.appId,
+                        authorId = currentUserId,
+                        authorUsername = currentUsername,
+                        sessionId = sub.sessionToken,
+                        buildVersion = sub.buildVersion,
+                        category = sub.category,
+                        title = sub.title,
+                        description = sub.description,
+                        deviceMetadata = sub.deviceMetadata,
+                        screenshotBytes = sub.screenshotBytes,
+                        screenshotFileName = sub.screenshotFileName,
+                        videoClipBytes = sub.videoClipBytes,
+                        videoFileName = sub.videoFileName,
+                        mediaDurationMs = sub.mediaDurationMs,
+                        localPreviewUri = sub.localPreviewUri
+                    )
+                }
+            }
 
             fun navigateTo(route: BuildGateRoute) {
                 activeTab = when (route) {

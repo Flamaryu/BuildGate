@@ -65,6 +65,23 @@
             </intent-filter>
         </activity>
 
+        <!-- Zero-UI transparent trampoline for Android 14-17 MediaProjection consent -->
+        <activity
+            android:name=".overlay.QaCapturePermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Floating QA Overlay Pill + MediaProjection Capture + Ongoing Notification Service -->
+        <service
+            android:name=".overlay.QaOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|mediaProjection">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Active closed-testing QA session timer, pause control, and floating bug-reporting overlay" />
+        </service>
+
     </application>
 
 </manifest>
