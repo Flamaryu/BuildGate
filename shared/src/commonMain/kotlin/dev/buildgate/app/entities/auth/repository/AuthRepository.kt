@@ -46,8 +46,8 @@ class DemoAuthRepository : AuthRepository {
     private val ledgerState = MutableStateFlow(
         listOf(
             KarmaEntry("k_1", "tester_1", 50, KarmaReason.SIGNUP_WELCOME, note = "Welcome to BuildGate", createdAtIso = "2026-11-10T09:00:00Z"),
-            KarmaEntry("k_2", "tester_1", 100, KarmaReason.DAY_14_COMPLETION_BONUS, appId = "app_3", note = "Completed 14-day test for SoundScape AI", createdAtIso = "2026-11-20T18:00:00Z"),
-            KarmaEntry("k_3", "tester_1", 25, KarmaReason.TRIAGED_BUG_BOUNTY, appId = "app_1", note = "Verified Bluetooth audio crash bug", createdAtIso = "2026-11-22T14:15:00Z")
+            KarmaEntry("k_2", "tester_1", 100, KarmaReason.DAY_14_COMPLETION_BONUS, appId = "app_3", note = "Completed 14-day test for Spacefold", createdAtIso = "2026-11-20T18:00:00Z"),
+            KarmaEntry("k_3", "tester_1", 25, KarmaReason.TRIAGED_BUG_BOUNTY, appId = "app_1", note = "Verified Wave 3 frame dip on Shatter Horde", createdAtIso = "2026-11-22T14:15:00Z")
         )
     )
 

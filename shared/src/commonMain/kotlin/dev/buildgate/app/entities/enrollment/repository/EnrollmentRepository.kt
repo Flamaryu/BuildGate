@@ -62,7 +62,7 @@ class DemoEnrollmentRepository : EnrollmentRepository {
                 currentStreak = 4,
                 missedDaysUsed = 0,
                 lastVerifiedUtcDate = yesterdayDate,
-                lastSeenVersionCode = 14L,
+                lastSeenVersionCode = 7L,
                 status = EnrollmentStatus.ACTIVE,
                 enrolledAtIso = "2026-11-20T10:00:00Z"
             ),
@@ -72,16 +72,30 @@ class DemoEnrollmentRepository : EnrollmentRepository {
                 testerId = "tester_1",
                 hasJoinedGoogleGroup = true,
                 hasAcceptedPlayOptIn = true,
-                verifiedDaysCount = 11,
-                currentStreak = 11,
+                verifiedDaysCount = 3,
+                currentStreak = 3,
                 missedDaysUsed = 0,
                 lastVerifiedUtcDate = yesterdayDate,
-                lastSeenVersionCode = 21L,
+                lastSeenVersionCode = 7L,
                 status = EnrollmentStatus.ACTIVE,
-                enrolledAtIso = "2026-11-13T10:00:00Z"
+                enrolledAtIso = "2026-11-21T10:00:00Z"
             ),
             Enrollment(
                 id = "enr_3",
+                appId = "app_3",
+                testerId = "tester_1",
+                hasJoinedGoogleGroup = true,
+                hasAcceptedPlayOptIn = true,
+                verifiedDaysCount = 2,
+                currentStreak = 2,
+                missedDaysUsed = 0,
+                lastVerifiedUtcDate = yesterdayDate,
+                lastSeenVersionCode = 8L,
+                status = EnrollmentStatus.ACTIVE,
+                enrolledAtIso = "2026-11-22T10:00:00Z"
+            ),
+            Enrollment(
+                id = "enr_4",
                 appId = "app_1",
                 testerId = "tester_2",
                 hasJoinedGoogleGroup = true,
@@ -90,7 +104,7 @@ class DemoEnrollmentRepository : EnrollmentRepository {
                 currentStreak = 14,
                 missedDaysUsed = 0,
                 lastVerifiedUtcDate = yesterdayDate,
-                lastSeenVersionCode = 14L,
+                lastSeenVersionCode = 7L,
                 status = EnrollmentStatus.COMPLETED,
                 enrolledAtIso = "2026-11-08T10:00:00Z"
             )
