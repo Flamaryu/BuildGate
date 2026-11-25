@@ -282,11 +282,14 @@ class BuildGateCoreTest {
         assertTrue(unifiedState.adbTestCommand.contains("buildgate.com.mkdinteractive.shatterhorde://buildgate-verify"))
 
         dev.buildgate.app.features.publishapp.DeepLinkSnippetLanguage.entries.forEach { lang ->
-            val snippet = unifiedState.snippetFor(lang)
-            assertTrue(snippet.contains("<intent-filter>"), "Missing full manifest intent-filter in $lang snippet")
-            assertTrue(snippet.contains("buildgate.com.mkdinteractive.shatterhorde"), "Missing unified scheme in $lang snippet")
-            assertTrue(snippet.contains("com.mkdinteractive.shatterhorde"), "Missing package in $lang snippet")
-            assertTrue(snippet.contains("verify-deeplink-heartbeat"), "Missing endpoint in $lang snippet")
+            val split = unifiedState.splitSnippetFor(lang)
+            assertTrue(split.manifestPath.contains("AndroidManifest.xml"), "Missing manifest path for $lang")
+            assertTrue(split.manifestXml.contains("<intent-filter>"), "Missing full manifest intent-filter in $lang")
+            assertTrue(split.manifestXml.contains("buildgate.com.mkdinteractive.shatterhorde"), "Missing unified scheme in $lang manifest")
+            assertTrue(split.handlerPath.isNotBlank(), "Missing handler path for $lang")
+            assertTrue(split.handlerCode.contains("buildgate.com.mkdinteractive.shatterhorde"), "Missing unified scheme in $lang handler")
+            assertTrue(split.handlerCode.contains("com.mkdinteractive.shatterhorde"), "Missing package in $lang handler")
+            assertTrue(split.handlerCode.contains("verify-deeplink-heartbeat"), "Missing endpoint in $lang handler")
         }
     }
 

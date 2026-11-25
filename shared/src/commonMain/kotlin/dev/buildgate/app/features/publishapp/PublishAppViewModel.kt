@@ -23,6 +23,13 @@ enum class DeepLinkSnippetLanguage(val label: String) {
     GODOT("Godot")
 }
 
+data class SplitDeepLinkSnippet(
+    val manifestPath: String,
+    val manifestXml: String,
+    val handlerPath: String,
+    val handlerCode: String
+)
+
 data class PublishAppUiState(
     val title: String = "",
     val packageName: String = "",
@@ -60,14 +67,14 @@ data class PublishAppUiState(
     val adbTestCommand: String
         get() = "adb shell am start -W -a android.intent.action.VIEW -d \"$resolvedDeepLinkScheme://buildgate-verify?nonce=test_123\""
 
-    val generatedSnippet: String
-        get() = snippetFor(selectedSnippetLanguage)
+    val currentSplitSnippet: SplitDeepLinkSnippet
+        get() = splitSnippetFor(selectedSnippetLanguage)
 
-    fun snippetFor(language: DeepLinkSnippetLanguage): String {
+    fun splitSnippetFor(language: DeepLinkSnippetLanguage): SplitDeepLinkSnippet {
         val scheme = resolvedDeepLinkScheme
         val pkg = packageName.trim().ifBlank { "com.yourcompany.app" }
         val endpoint = "https://<PROJECT>.supabase.co/functions/v1/verify-deeplink-heartbeat"
-        val manifestFilter = """
+        val manifestXml = """
 <intent-filter>
     <action android:name="android.intent.action.VIEW" />
     <category android:name="android.intent.category.DEFAULT" />
@@ -77,11 +84,11 @@ data class PublishAppUiState(
         """.trimIndent()
 
         return when (language) {
-            DeepLinkSnippetLanguage.KOTLIN -> """
-<!-- 1. AndroidManifest.xml (inside your main <activity>) -->
-$manifestFilter
-
-// 2. MainActivity.kt (call from onCreate & onNewIntent):
+            DeepLinkSnippetLanguage.KOTLIN -> SplitDeepLinkSnippet(
+                manifestPath = "app/src/main/AndroidManifest.xml (inside main <activity>)",
+                manifestXml = manifestXml,
+                handlerPath = "MainActivity.kt (call from onCreate & onNewIntent)",
+                handlerCode = """
 intent?.data?.takeIf { it.scheme == "$scheme" && it.host == "buildgate-verify" }?.let { uri ->
     val nonce = uri.getQueryParameter("nonce") ?: return@let
     lifecycleScope.launch(Dispatchers.IO) {
@@ -94,13 +101,14 @@ intent?.data?.takeIf { it.scheme == "$scheme" && it.host == "buildgate-verify" }
         }
     }
 }
-            """.trimIndent()
+                """.trimIndent()
+            )
 
-            DeepLinkSnippetLanguage.JAVA -> """
-<!-- 1. AndroidManifest.xml (inside your main <activity>) -->
-$manifestFilter
-
-// 2. MainActivity.java (call from onCreate & onNewIntent):
+            DeepLinkSnippetLanguage.JAVA -> SplitDeepLinkSnippet(
+                manifestPath = "app/src/main/AndroidManifest.xml (inside main <activity>)",
+                manifestXml = manifestXml,
+                handlerPath = "MainActivity.java (call from onCreate & onNewIntent)",
+                handlerCode = """
 Uri uri = getIntent() != null ? getIntent().getData() : null;
 if (uri != null && "$scheme".equals(uri.getScheme()) && "buildgate-verify".equals(uri.getHost())) {
     String nonce = uri.getQueryParameter("nonce");
@@ -117,13 +125,14 @@ if (uri != null && "$scheme".equals(uri.getScheme()) && "buildgate-verify".equal
         });
     }
 }
-            """.trimIndent()
+                """.trimIndent()
+            )
 
-            DeepLinkSnippetLanguage.FLUTTER -> """
-<!-- 1. android/app/src/main/AndroidManifest.xml (inside MainActivity) -->
-$manifestFilter
-
-// 2. main.dart (pubspec: app_links; uses built-in dart:io HttpClient):
+            DeepLinkSnippetLanguage.FLUTTER -> SplitDeepLinkSnippet(
+                manifestPath = "android/app/src/main/AndroidManifest.xml (inside MainActivity)",
+                manifestXml = manifestXml,
+                handlerPath = "lib/main.dart (pubspec: app_links; built-in dart:io HttpClient)",
+                handlerCode = """
 AppLinks().uriLinkStream.listen((uri) async {
   if (uri.scheme == '$scheme' && uri.host == 'buildgate-verify') {
     final nonce = uri.queryParameters['nonce'];
@@ -134,13 +143,14 @@ AppLinks().uriLinkStream.listen((uri) async {
     await (await req.close()).drain();
   }
 });
-            """.trimIndent()
+                """.trimIndent()
+            )
 
-            DeepLinkSnippetLanguage.REACT_NATIVE -> """
-<!-- 1. AndroidManifest.xml (or Expo app.json: "scheme": "$scheme") -->
-$manifestFilter
-
-// 2. App.tsx (React Native / Expo):
+            DeepLinkSnippetLanguage.REACT_NATIVE -> SplitDeepLinkSnippet(
+                manifestPath = "android/app/src/main/AndroidManifest.xml (or Expo app.json \"scheme\": \"$scheme\")",
+                manifestXml = manifestXml,
+                handlerPath = "App.tsx (React Native / Expo Linking API)",
+                handlerCode = """
 import { Linking } from 'react-native';
 
 const handleUrl = ({ url }: { url: string }) => {
@@ -155,13 +165,14 @@ const handleUrl = ({ url }: { url: string }) => {
 };
 Linking.getInitialURL().then(url => url && handleUrl({ url }));
 Linking.addEventListener('url', handleUrl);
-            """.trimIndent()
+                """.trimIndent()
+            )
 
-            DeepLinkSnippetLanguage.UNITY -> """
-<!-- 1. Assets/Plugins/Android/AndroidManifest.xml (inside UnityPlayerActivity) -->
-$manifestFilter
-
-// 2. BuildGateVerifier.cs (attach to a GameObject in your first scene):
+            DeepLinkSnippetLanguage.UNITY -> SplitDeepLinkSnippet(
+                manifestPath = "Assets/Plugins/Android/AndroidManifest.xml (inside UnityPlayerActivity)",
+                manifestXml = manifestXml,
+                handlerPath = "BuildGateVerifier.cs (attach to a GameObject in your first scene)",
+                handlerCode = """
 void Awake() {
     Application.deepLinkActivated += OnDeepLink;
     if (!string.IsNullOrEmpty(Application.absoluteURL)) OnDeepLink(Application.absoluteURL);
@@ -176,13 +187,14 @@ IEnumerator PostHeartbeat(string nonce) {
     using var req = UnityWebRequest.Post("$endpoint", json, "application/json");
     yield return req.SendWebRequest();
 }
-            """.trimIndent()
+                """.trimIndent()
+            )
 
-            DeepLinkSnippetLanguage.GODOT -> """
-<!-- 1. Android export AndroidManifest.xml (inside GodotApp activity) -->
-$manifestFilter
-
-# 2. buildgate_verify.gd (autoload in Godot 4):
+            DeepLinkSnippetLanguage.GODOT -> SplitDeepLinkSnippet(
+                manifestPath = "android/build/AndroidManifest.xml (inside GodotApp activity)",
+                manifestXml = manifestXml,
+                handlerPath = "buildgate_verify.gd (Autoload script in Godot 4)",
+                handlerCode = """
 func _ready() -> void:
     for arg in OS.get_cmdline_args():
         if arg.begins_with("$scheme://buildgate-verify"):
@@ -191,7 +203,8 @@ func _ready() -> void:
             add_child(http)
             var body = JSON.stringify({"nonce": nonce, "package_name": "$pkg"})
             http.request("$endpoint", ["Content-Type: application/json"], HTTPClient.METHOD_POST, body)
-            """.trimIndent()
+                """.trimIndent()
+            )
         }
     }
 }
