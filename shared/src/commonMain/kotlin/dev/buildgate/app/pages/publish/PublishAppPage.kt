@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -232,65 +233,155 @@ fun PublishAppPage(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "3. Optional Tier-2 Cryptographic Deep-Link Handshake",
+                            text = "3. Optional Tier-2 Deep-Link Handshake",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Leave blank for Zero-SDK Mode (works immediately with 0 code changes). Or enter a custom URI scheme to earn the 🔗 Deep-Link Verified badge and reward testers +5 bonus Karma/day.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
 
-                        OutlinedTextField(
-                            value = state.deepLinkScheme,
-                            onValueChange = { viewModel.onDeepLinkSchemeChanged(it) },
-                            label = { Text("Optional Custom URI Scheme (e.g., focuspulse)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        HorizontalDivider()
-
-                        Row(
+                        // Plain-English Beginner Explainer Card
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            DeepLinkSnippetLanguage.entries.forEach { lang ->
-                                FilterChip(
-                                    selected = state.selectedSnippetLanguage == lang,
-                                    onClick = { viewModel.onSnippetLanguageSelected(lang) },
-                                    label = { Text(lang.label) }
-                                )
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(12.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f))
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = state.generatedSnippet,
+                                text = "What is a Deep Link & Custom URI?",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "A Custom URI works like a private web link that Android routes straight into your app instead of a browser — carrying a one-time verification code (nonce). No website domain or SDK required.",
                                 style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "• Zero-SDK Default (OFF): Works immediately with 0 code changes.\n• Deep-Link Handshake (ON): Proves your actual binary booted, unlocks the 🔗 Verified badge, and rewards testers +5 bonus Karma/day.",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
-                        OutlinedButton(
-                            onClick = {
-                                val langLabel = state.selectedSnippetLanguage.label
-                                platformVerifier.copyToClipboard("$langLabel Deep-Link Snippet", state.generatedSnippet)
-                                scope.launch { snackbarHostState.showSnackbar("Copied $langLabel Deep-Link snippet!") }
-                            },
-                            shape = RoundedCornerShape(12.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                         ) {
-                            Text("Copy ${state.selectedSnippetLanguage.label} Handshake Snippet")
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Enable Unified Deep-Link Handshake",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Auto-generates a collision-free URI from your Package ID",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = state.enableDeepLinkHandshake,
+                                onCheckedChange = { viewModel.onToggleDeepLinkHandshake(it) }
+                            )
+                        }
+
+                        if (state.enableDeepLinkHandshake) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "Unified BuildGate URI Format (Auto-Generated):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = state.unifiedFullUriPreview,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = state.deepLinkScheme,
+                                onValueChange = { viewModel.onDeepLinkSchemeChanged(it) },
+                                label = { Text("Custom Scheme Override (leave blank to use ${state.unifiedDefaultScheme})") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            HorizontalDivider()
+
+                            Text(
+                                text = "Choose Your App's Language / Engine (2-Step Setup):",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                DeepLinkSnippetLanguage.entries.forEach { lang ->
+                                    FilterChip(
+                                        selected = state.selectedSnippetLanguage == lang,
+                                        onClick = { viewModel.onSnippetLanguageSelected(lang) },
+                                        label = { Text(lang.label) }
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = state.generatedSnippet,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val langLabel = state.selectedSnippetLanguage.label
+                                        platformVerifier.copyToClipboard("$langLabel Deep-Link Snippet", state.generatedSnippet)
+                                        scope.launch { snackbarHostState.showSnackbar("Copied $langLabel setup snippet!") }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Copy ${state.selectedSnippetLanguage.label} Snippet")
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        platformVerifier.copyToClipboard("ADB Deep-Link Test", state.adbTestCommand)
+                                        scope.launch { snackbarHostState.showSnackbar("Copied adb test command!") }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Copy ADB Test Cmd")
+                                }
+                            }
                         }
 
                         Button(

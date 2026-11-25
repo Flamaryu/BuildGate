@@ -32,25 +32,56 @@ data class PublishAppUiState(
     val currentBuildVersion: String = "v1.0.0-rc1",
     val targetTesters: String = "16",
     val category: String = "Productivity",
+    val enableDeepLinkHandshake: Boolean = false,
     val deepLinkScheme: String = "",
     val selectedSnippetLanguage: DeepLinkSnippetLanguage = DeepLinkSnippetLanguage.KOTLIN,
     val initialMissionTitle: String = "",
     val initialMissionInstructions: String = "",
     val isSubmitting: Boolean = false
 ) {
+    /**
+     * Unified, globally collision-free custom URI scheme derived automatically from the Android package ID
+     * (valid RFC 3986 scheme syntax: lowercase letters, digits, dots, hyphens).
+     * Example: com.mkdinteractive.shatterhorde -> buildgate.com.mkdinteractive.shatterhorde
+     */
+    val unifiedDefaultScheme: String
+        get() {
+            val cleanPkg = packageName.trim().lowercase().replace(Regex("[^a-z0-9.-]"), "")
+            return if (cleanPkg.isNotBlank()) "buildgate.$cleanPkg" else "buildgate.com.yourcompany.app"
+        }
+
+    /** Active scheme used in snippets and published when [enableDeepLinkHandshake] is enabled. */
+    val resolvedDeepLinkScheme: String
+        get() = deepLinkScheme.trim().lowercase().ifBlank { unifiedDefaultScheme }
+
+    val unifiedFullUriPreview: String
+        get() = "$resolvedDeepLinkScheme://buildgate-verify?nonce=<one_time_token>"
+
+    val adbTestCommand: String
+        get() = "adb shell am start -W -a android.intent.action.VIEW -d \"$resolvedDeepLinkScheme://buildgate-verify?nonce=test_123\""
+
     val generatedSnippet: String
         get() = snippetFor(selectedSnippetLanguage)
 
     fun snippetFor(language: DeepLinkSnippetLanguage): String {
-        val scheme = deepLinkScheme.trim().ifBlank { "myapp" }
+        val scheme = resolvedDeepLinkScheme
         val pkg = packageName.trim().ifBlank { "com.yourcompany.app" }
         val endpoint = "https://<PROJECT>.supabase.co/functions/v1/verify-deeplink-heartbeat"
+        val manifestFilter = """
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="$scheme" android:host="buildgate-verify" />
+</intent-filter>
+        """.trimIndent()
+
         return when (language) {
             DeepLinkSnippetLanguage.KOTLIN -> """
-// 1. AndroidManifest.xml (inside MainActivity):
-// <data android:scheme="$scheme" android:host="buildgate-verify" />
+<!-- 1. AndroidManifest.xml (inside your main <activity>) -->
+$manifestFilter
 
-// 2. MainActivity.onCreate / onNewIntent (Kotlin):
+// 2. MainActivity.kt (call from onCreate & onNewIntent):
 intent?.data?.takeIf { it.scheme == "$scheme" && it.host == "buildgate-verify" }?.let { uri ->
     val nonce = uri.getQueryParameter("nonce") ?: return@let
     lifecycleScope.launch(Dispatchers.IO) {
@@ -66,10 +97,10 @@ intent?.data?.takeIf { it.scheme == "$scheme" && it.host == "buildgate-verify" }
             """.trimIndent()
 
             DeepLinkSnippetLanguage.JAVA -> """
-// 1. AndroidManifest.xml (inside MainActivity):
-// <data android:scheme="$scheme" android:host="buildgate-verify" />
+<!-- 1. AndroidManifest.xml (inside your main <activity>) -->
+$manifestFilter
 
-// 2. MainActivity.onCreate / onNewIntent (Java):
+// 2. MainActivity.java (call from onCreate & onNewIntent):
 Uri uri = getIntent() != null ? getIntent().getData() : null;
 if (uri != null && "$scheme".equals(uri.getScheme()) && "buildgate-verify".equals(uri.getHost())) {
     String nonce = uri.getQueryParameter("nonce");
@@ -89,10 +120,10 @@ if (uri != null && "$scheme".equals(uri.getScheme()) && "buildgate-verify".equal
             """.trimIndent()
 
             DeepLinkSnippetLanguage.FLUTTER -> """
-// 1. android/app/src/main/AndroidManifest.xml (inside MainActivity):
-// <data android:scheme="$scheme" android:host="buildgate-verify" />
+<!-- 1. android/app/src/main/AndroidManifest.xml (inside MainActivity) -->
+$manifestFilter
 
-// 2. main.dart (using app_links + dart:io HttpClient):
+// 2. main.dart (pubspec: app_links; uses built-in dart:io HttpClient):
 AppLinks().uriLinkStream.listen((uri) async {
   if (uri.scheme == '$scheme' && uri.host == 'buildgate-verify') {
     final nonce = uri.queryParameters['nonce'];
@@ -106,8 +137,8 @@ AppLinks().uriLinkStream.listen((uri) async {
             """.trimIndent()
 
             DeepLinkSnippetLanguage.REACT_NATIVE -> """
-// 1. AndroidManifest.xml (or Expo app.json "scheme": "$scheme"):
-// <data android:scheme="$scheme" android:host="buildgate-verify" />
+<!-- 1. AndroidManifest.xml (or Expo app.json: "scheme": "$scheme") -->
+$manifestFilter
 
 // 2. App.tsx (React Native / Expo):
 import { Linking } from 'react-native';
@@ -127,10 +158,10 @@ Linking.addEventListener('url', handleUrl);
             """.trimIndent()
 
             DeepLinkSnippetLanguage.UNITY -> """
-// 1. Plugins/Android/AndroidManifest.xml (inside UnityPlayerActivity):
-// <data android:scheme="$scheme" android:host="buildgate-verify" />
+<!-- 1. Assets/Plugins/Android/AndroidManifest.xml (inside UnityPlayerActivity) -->
+$manifestFilter
 
-// 2. BuildGateVerifier.cs (Unity C#):
+// 2. BuildGateVerifier.cs (attach to a GameObject in your first scene):
 void Awake() {
     Application.deepLinkActivated += OnDeepLink;
     if (!string.IsNullOrEmpty(Application.absoluteURL)) OnDeepLink(Application.absoluteURL);
@@ -148,10 +179,10 @@ IEnumerator PostHeartbeat(string nonce) {
             """.trimIndent()
 
             DeepLinkSnippetLanguage.GODOT -> """
-# 1. Android export / AndroidManifest.xml (inside GodotApp activity):
-# <data android:scheme="$scheme" android:host="buildgate-verify" />
+<!-- 1. Android export AndroidManifest.xml (inside GodotApp activity) -->
+$manifestFilter
 
-# 2. buildgate_verify.gd (Godot 4 GDScript):
+# 2. buildgate_verify.gd (autoload in Godot 4):
 func _ready() -> void:
     for arg in OS.get_cmdline_args():
         if arg.begins_with("$scheme://buildgate-verify"):
@@ -200,6 +231,7 @@ class PublishAppViewModel(
     fun onBuildVersionChanged(v: String) { _uiState.update { it.copy(currentBuildVersion = v) } }
     fun onTargetTestersChanged(v: String) { _uiState.update { it.copy(targetTesters = v) } }
     fun onCategoryChanged(v: String) { _uiState.update { it.copy(category = v) } }
+    fun onToggleDeepLinkHandshake(enabled: Boolean) { _uiState.update { it.copy(enableDeepLinkHandshake = enabled) } }
     fun onDeepLinkSchemeChanged(v: String) { _uiState.update { it.copy(deepLinkScheme = v.lowercase().trim()) } }
     fun onSnippetLanguageSelected(lang: DeepLinkSnippetLanguage) { _uiState.update { it.copy(selectedSnippetLanguage = lang) } }
     fun onInitialMissionTitleChanged(v: String) { _uiState.update { it.copy(initialMissionTitle = v) } }
@@ -233,7 +265,7 @@ class PublishAppViewModel(
                         shortSummary = s.shortSummary.trim().ifBlank { "14-day closed testing campaign on BuildGate" },
                         playStoreOptInUrl = s.playStoreOptInUrl.trim(),
                         googleGroupUrl = s.googleGroupUrl.trim(),
-                        deepLinkScheme = s.deepLinkScheme.trim().takeIf { it.isNotBlank() },
+                        deepLinkScheme = if (s.enableDeepLinkHandshake) s.resolvedDeepLinkScheme else null,
                         currentBuildVersion = s.currentBuildVersion.trim().ifBlank { "v1.0.0" },
                         targetTesters = (s.targetTesters.toIntOrNull() ?: 16).coerceAtLeast(12),
                         ownerKarmaBalance = ownerKarma,
