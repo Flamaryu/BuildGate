@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data class AuthUser(
     val id: String,
     val email: String,
-    val role: String = "tester"
+    val isGoogleLinked: Boolean = false
 )
 
 @Serializable
@@ -15,5 +15,6 @@ data class AuthSession(
     val accessToken: String? = null,
     val user: AuthUser? = null,
     val profile: TesterProfile? = null,
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val isDemoMode: Boolean = true
 )

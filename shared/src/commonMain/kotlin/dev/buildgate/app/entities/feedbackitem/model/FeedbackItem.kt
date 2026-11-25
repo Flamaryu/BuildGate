@@ -1,12 +1,15 @@
 package dev.buildgate.app.entities.feedbackitem.model
 
 import dev.buildgate.app.shared.platform.DeviceMetadata
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@Serializable
 enum class FeedbackCategory {
     BUG, UX_FRICTION, IDEA
 }
 
+@Serializable
 enum class FeedbackStatus {
     OPEN, IN_PROGRESS, FIXED, WONT_FIX
 }
@@ -14,13 +17,20 @@ enum class FeedbackStatus {
 @Serializable
 data class FeedbackItem(
     val id: String,
-    val appId: String,
-    val authorId: String,
-    val buildVersion: String,
+    @SerialName("app_id") val appId: String,
+    @SerialName("author_id") val authorId: String,
+    @SerialName("author_username") val authorUsername: String = "Tester",
+    @SerialName("session_id") val sessionId: String? = null,
+    @SerialName("build_version") val buildVersion: String,
     val category: FeedbackCategory,
     val status: FeedbackStatus = FeedbackStatus.OPEN,
     val title: String,
     val description: String,
-    val deviceMetadata: DeviceMetadata,
-    val upvotes: Int = 0
+    @SerialName("device_metadata") val deviceMetadata: DeviceMetadata,
+    @SerialName("screenshot_url") val screenshotUrl: String? = null,
+    @SerialName("video_clip_url") val videoClipUrl: String? = null,
+    @SerialName("media_duration_ms") val mediaDurationMs: Int? = null,
+    val upvotes: Int = 0,
+    @SerialName("bounty_awarded") val bountyAwarded: Boolean = false,
+    @SerialName("created_at") val createdAtIso: String = ""
 )

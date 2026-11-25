@@ -10,10 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -28,10 +32,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.buildgate.app.entities.feedbackitem.model.FeedbackCategory
 import dev.buildgate.app.entities.feedbackitem.ui.FeedbackItemCard
+import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackEvent
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
+import dev.buildgate.app.features.triagefeedback.TriageUiEvent
 import dev.buildgate.app.widgets.devicetable.DeviceMetadataTable
 import dev.buildgate.app.widgets.kanban.TriageKanbanBoard
 import dev.buildgate.app.widgets.retention.RetentionTracker14Day
@@ -39,23 +46,48 @@ import dev.buildgate.app.widgets.retention.RetentionTracker14Day
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TriageBoardPage(
+    appId: String,
     triageViewModel: TriageFeedbackViewModel,
     submitViewModel: SubmitFeedbackViewModel,
+    missionsViewModel: ManageMissionsViewModel,
     testerId: String,
+    testerUsername: String = "Tester",
+    onOpenProductionPacket: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val triageState by triageViewModel.uiState.collectAsState()
     val submitState by submitViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(appId) {
+        triageViewModel.selectApp(appId)
+    }
+
+    LaunchedEffect(triageState.selectedApp?.id, triageState.selectedApp?.currentBuildVersion) {
+        val currentApp = triageState.selectedApp ?: return@LaunchedEffect
+        submitViewModel.setAppContext(currentApp.id, currentApp.currentBuildVersion)
+        missionsViewModel.selectApp(currentApp.id, currentApp.currentBuildVersion)
+    }
+
     LaunchedEffect(Unit) {
         submitViewModel.eventFlow.collect { event ->
             when (event) {
                 is SubmitFeedbackEvent.ShowMessage -> snackbarHostState.showSnackbar(event.msg)
-                SubmitFeedbackEvent.SubmissionSuccess -> { /* submitted */ }
+                SubmitFeedbackEvent.SubmissionSuccess -> Unit
             }
         }
     }
+
+    LaunchedEffect(Unit) {
+        triageViewModel.eventFlow.collect { event ->
+            when (event) {
+                is TriageUiEvent.ShowMessage -> snackbarHostState.showSnackbar(event.msg)
+            }
+        }
+    }
+
+    val currentApp = triageState.selectedApp
+    val bestStreak = triageState.enrollmentsForApp.maxOfOrNull { it.currentStreak } ?: 0
 
     Scaffold(
         topBar = {
@@ -63,15 +95,26 @@ fun TriageBoardPage(
                 title = {
                     Column {
                         Text(
-                            text = "Triage & Feedback Hub",
+                            text = "Triage & QA Hub",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "FocusPulse Pro (v1.0.4-rc1)",
+                            text = "${currentApp?.title ?: "App"} (${currentApp?.currentBuildVersion ?: "v1.0.0"})",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                },
+                actions = {
+                    currentApp?.let { app ->
+                        OutlinedButton(
+                            onClick = { onOpenProductionPacket(app.id) },
+                            modifier = Modifier.padding(end = 12.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Export Play Packet")
+                        }
                     }
                 }
             )
@@ -85,21 +128,25 @@ fun TriageBoardPage(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            val isWideScreen = maxWidth >= 800.dp
+            val isWideScreen = maxWidth >= 840.dp
 
             if (isWideScreen) {
-                // Expanded Web / Desktop Layout: Wide 3-column Kanban + Retention Tracker & Specs side-panel
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Left 2/3: Multi-column Kanban Board
                     Column(
                         modifier = Modifier
                             .weight(2f)
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        AppSwitcherStrip(
+                            apps = triageState.availableApps,
+                            selectedAppId = triageState.selectedAppId,
+                            onSelectApp = { triageViewModel.selectApp(it) }
+                        )
+
                         TriageKanbanBoard(
                             items = triageState.items,
                             onStatusChange = { id, status -> triageViewModel.updateStatus(id, status) },
@@ -108,16 +155,25 @@ fun TriageBoardPage(
                         )
                     }
 
-                    // Right 1/3: 14-day Retention Progress & Device Specs Table
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         RetentionTracker14Day(
-                            verifiedDaysCount = 11,
-                            testerName = "FocusPulse Active Testers"
+                            verifiedDaysCount = bestStreak,
+                            testerName = "${triageState.enrollmentsForApp.size} Enrolled Testers"
+                        )
+
+                        FeedbackComposerSection(
+                            submitViewModel = submitViewModel,
+                            submitTitle = submitState.title,
+                            submitDescription = submitState.description,
+                            selectedCategory = submitState.category,
+                            specsSummary = submitState.capturedSpecs?.let { "${it.model} (${it.screenResolution})" },
+                            onSubmit = { submitViewModel.submit(testerId, testerUsername) }
                         )
 
                         submitState.capturedSpecs?.let { specs ->
@@ -126,54 +182,27 @@ fun TriageBoardPage(
                     }
                 }
             } else {
-                // Mobile Layout: Fast Bug Submission Sheet + Triage List
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "Submit Bug or UX Friction Report",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                        AppSwitcherStrip(
+                            apps = triageState.availableApps,
+                            selectedAppId = triageState.selectedAppId,
+                            onSelectApp = { triageViewModel.selectApp(it) }
+                        )
+                    }
 
-                            OutlinedTextField(
-                                value = submitState.title,
-                                onValueChange = { submitViewModel.onTitleChanged(it) },
-                                label = { Text("Issue Title") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-
-                            OutlinedTextField(
-                                value = submitState.description,
-                                onValueChange = { submitViewModel.onDescriptionChanged(it) },
-                                label = { Text("Detailed Steps / Friction Description") },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 3,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-
-                            // Specs preview tag
-                            submitState.capturedSpecs?.let { specs ->
-                                Text(
-                                    text = "📱 Auto-attached Specs: ${specs.model} (${specs.screenResolution})",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            Button(
-                                onClick = { submitViewModel.submit(testerId) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Submit Report with Hardware Specs")
-                            }
-                        }
+                    item {
+                        FeedbackComposerSection(
+                            submitViewModel = submitViewModel,
+                            submitTitle = submitState.title,
+                            submitDescription = submitState.description,
+                            selectedCategory = submitState.category,
+                            specsSummary = submitState.capturedSpecs?.let { "${it.model} (${it.screenResolution})" },
+                            onSubmit = { submitViewModel.submit(testerId, testerUsername) }
+                        )
                     }
 
                     item {
@@ -182,11 +211,11 @@ fun TriageBoardPage(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(top = 12.dp)
+                            modifier = Modifier.padding(top = 8.dp)
                         )
                     }
 
-                    items(triageState.items) { item ->
+                    items(triageState.items, key = { it.id }) { item ->
                         FeedbackItemCard(
                             item = item,
                             onUpvoteClick = { triageViewModel.upvote(item.id) },
@@ -195,6 +224,88 @@ fun TriageBoardPage(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AppSwitcherStrip(
+    apps: List<dev.buildgate.app.entities.applisting.model.AppListing>,
+    selectedAppId: String,
+    onSelectApp: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        apps.forEach { app ->
+            FilterChip(
+                selected = app.id == selectedAppId,
+                onClick = { onSelectApp(app.id) },
+                label = { Text(app.title.substringBefore(" -")) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedbackComposerSection(
+    submitViewModel: SubmitFeedbackViewModel,
+    submitTitle: String,
+    submitDescription: String,
+    selectedCategory: FeedbackCategory,
+    specsSummary: String?,
+    onSubmit: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "Log Bug or UX Friction",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FeedbackCategory.entries.forEach { cat ->
+                FilterChip(
+                    selected = selectedCategory == cat,
+                    onClick = { submitViewModel.onCategoryChanged(cat) },
+                    label = { Text(cat.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = submitTitle,
+            onValueChange = { submitViewModel.onTitleChanged(it) },
+            label = { Text("Issue Title") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        OutlinedTextField(
+            value = submitDescription,
+            onValueChange = { submitViewModel.onDescriptionChanged(it) },
+            label = { Text("Reproduction Steps / Expected vs Actual") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3,
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        specsSummary?.let { summary ->
+            Text(
+                text = "📱 Auto-attached Specs: $summary",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Button(
+            onClick = onSubmit,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Submit Report with Hardware Specs")
         }
     }
 }
