@@ -14,6 +14,7 @@ import dev.buildgate.app.features.publishapp.PublishAppViewModel
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
 import dev.buildgate.app.features.verifysession.VerifySessionViewModel
+import dev.buildgate.app.shared.network.BuildGateSupabaseClientHolder
 import dev.buildgate.app.shared.network.SupabaseAppListingRepository
 import dev.buildgate.app.shared.network.SupabaseAuthRepository
 import dev.buildgate.app.shared.network.SupabaseConfig
@@ -31,25 +32,25 @@ val appModule = module {
     // Network, Supabase Client & Active QA Session Coordinator
     single { SupabaseConfig() }
     single { createBuildGateHttpClient(get()) }
-    single { createBuildGateSupabaseClientOrNull(get()) }
+    single { BuildGateSupabaseClientHolder(createBuildGateSupabaseClientOrNull(get())) }
     single { getPlatformVerifier() }
     single { GlobalQaSession.coordinator }
 
     // Dual-Mode Repositories (Live Hosted Supabase when local.properties is set; Reactive Demo fallback otherwise)
     single<AuthRepository> {
-        val sb = getOrNull<io.github.jan.supabase.SupabaseClient>()
+        val sb = get<BuildGateSupabaseClientHolder>().client
         if (sb != null) SupabaseAuthRepository(sb) else DemoAuthRepository()
     }
     single<AppListingRepository> {
-        val sb = getOrNull<io.github.jan.supabase.SupabaseClient>()
+        val sb = get<BuildGateSupabaseClientHolder>().client
         if (sb != null) SupabaseAppListingRepository(sb) else DemoAppListingRepository()
     }
     single<EnrollmentRepository> {
-        val sb = getOrNull<io.github.jan.supabase.SupabaseClient>()
+        val sb = get<BuildGateSupabaseClientHolder>().client
         if (sb != null) SupabaseEnrollmentRepository(sb) else DemoEnrollmentRepository()
     }
     single<FeedbackRepository> {
-        val sb = getOrNull<io.github.jan.supabase.SupabaseClient>()
+        val sb = get<BuildGateSupabaseClientHolder>().client
         if (sb != null) SupabaseFeedbackRepository(sb) else DemoFeedbackRepository()
     }
 

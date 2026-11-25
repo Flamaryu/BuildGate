@@ -1,24 +1,37 @@
 package dev.buildgate.app
 
+import dev.buildgate.app.app.di.appModule
 import dev.buildgate.app.app.navigation.BuildGateRoute
 import dev.buildgate.app.app.navigation.DeepLinkRouter
 import dev.buildgate.app.app.navigation.IncomingDeepLink
 import dev.buildgate.app.entities.applisting.model.AppListing
+import dev.buildgate.app.entities.applisting.repository.AppListingRepository
+import dev.buildgate.app.entities.auth.repository.AuthRepository
 import dev.buildgate.app.entities.dailyverification.model.VerificationMethod
 import dev.buildgate.app.entities.enrollment.domain.StreakAndKarmaCalculator
 import dev.buildgate.app.entities.enrollment.model.Enrollment
 import dev.buildgate.app.entities.enrollment.model.EnrollmentStatus
+import dev.buildgate.app.entities.enrollment.repository.EnrollmentRepository
 import dev.buildgate.app.entities.feedbackitem.model.FeedbackCategory
 import dev.buildgate.app.entities.feedbackitem.model.FeedbackStatus
 import dev.buildgate.app.entities.feedbackitem.repository.DemoFeedbackRepository
+import dev.buildgate.app.entities.feedbackitem.repository.FeedbackRepository
+import dev.buildgate.app.features.auth.AuthViewModel
+import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
+import dev.buildgate.app.features.publishapp.PublishAppViewModel
+import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
+import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
+import dev.buildgate.app.features.verifysession.VerifySessionViewModel
 import dev.buildgate.app.shared.platform.DeviceMetadata
 import dev.buildgate.app.shared.session.QaSessionCoordinator
 import dev.buildgate.app.shared.session.QaSessionPhase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.koin.dsl.koinApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -185,6 +198,25 @@ class BuildGateCoreTest {
         // Subsequent transition to FIXED does not double-award bounty
         val secondTriage = repo.updateFeedbackStatus(created.id, FeedbackStatus.FIXED)
         assertNull(secondTriage.newlyAwardedBountyToAuthorId)
+    }
+
+    @Test
+    fun koinAppModule_resolvesAllRepositoriesAndViewModelsInDemoMode() {
+        val app = koinApplication {
+            modules(appModule)
+        }
+        val koin = app.koin
+        assertNotNull(koin.get<AuthRepository>())
+        assertNotNull(koin.get<AppListingRepository>())
+        assertNotNull(koin.get<EnrollmentRepository>())
+        assertNotNull(koin.get<FeedbackRepository>())
+        assertNotNull(koin.get<AuthViewModel>())
+        assertNotNull(koin.get<VerifySessionViewModel>())
+        assertNotNull(koin.get<TriageFeedbackViewModel>())
+        assertNotNull(koin.get<SubmitFeedbackViewModel>())
+        assertNotNull(koin.get<ManageMissionsViewModel>())
+        assertNotNull(koin.get<PublishAppViewModel>())
+        app.close()
     }
 
     private fun sampleApp(id: String, pkg: String) = AppListing(

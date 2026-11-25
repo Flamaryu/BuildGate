@@ -8,6 +8,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
 
+class BuildGateSupabaseClientHolder(val client: SupabaseClient?)
+
 fun createBuildGateSupabaseClientOrNull(config: SupabaseConfig): SupabaseClient? {
     if (!config.isLiveConfigured) return null
     return createSupabaseClient(
