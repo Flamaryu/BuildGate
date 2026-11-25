@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -222,32 +223,47 @@ class VerifySessionViewModel(
         val sessionToken = _uiState.value.sessionToken.ifBlank { "bg_sess_${(100000..999999).random()}" }
         val enrollment = _uiState.value.enrollment
 
-        sessionCoordinator.startAppSession(
-            app = currentApp,
-            enrollmentId = enrollment?.id,
-            testerId = activeTesterId,
-            sessionToken = sessionToken,
-            targetDurationMs = 60_000L
-        )
-
-        val launched = platformVerifier.launchTargetApp(
-            packageName = currentApp.packageName,
-            sessionToken = sessionToken,
-            deepLinkScheme = currentApp.deepLinkScheme
-        )
-        if (!launched) {
-            sessionCoordinator.stopSession()
-            viewModelScope.launch {
-                _eventChannel.send(SessionUiEvent.ShowMessage("Unable to launch ${currentApp.packageName}"))
-            }
-            return
-        }
-
         viewModelScope.launch {
-            _eventChannel.send(SessionUiEvent.ShowMessage("Testing ${currentApp.title} — QA timer active (60s)"))
-        }
+            // Ensure the QA overlay always knows the full remaining daily queue — even when launched
+            // from Discovery or after closing the pill via stopSession().
+            val existingQueue = sessionCoordinator.state.value.queueApps
+            if (existingQueue.isEmpty() || existingQueue.none { it.id == currentApp.id }) {
+                val allListings = appListingRepository.getListings().first()
+                val testerEnrollments = enrollmentRepository.getEnrollmentsForTester(activeTesterId).first()
+                val todayUtc = BuildGateClock.todayUtcDate()
+                val remainingEnrolled = testerEnrollments
+                    .filter {
+                        it.status != dev.buildgate.app.entities.enrollment.model.EnrollmentStatus.COMPLETED &&
+                            it.lastVerifiedUtcDate != todayUtc &&
+                            it.appId != currentApp.id
+                    }
+                    .mapNotNull { enr -> allListings.find { it.id == enr.appId } }
+                val orderedQueue = listOf(currentApp) + remainingEnrolled
+                sessionCoordinator.startQueue(orderedQueue, activeTesterId)
+            }
 
-        startMonotonicTicker(currentApp.id)
+            sessionCoordinator.startAppSession(
+                app = currentApp,
+                enrollmentId = enrollment?.id,
+                testerId = activeTesterId,
+                sessionToken = sessionToken,
+                targetDurationMs = 60_000L
+            )
+
+            val launched = platformVerifier.launchTargetApp(
+                packageName = currentApp.packageName,
+                sessionToken = sessionToken,
+                deepLinkScheme = currentApp.deepLinkScheme
+            )
+            if (!launched) {
+                sessionCoordinator.stopSession()
+                _eventChannel.send(SessionUiEvent.ShowMessage("Unable to launch ${currentApp.packageName}"))
+                return@launch
+            }
+
+            _eventChannel.send(SessionUiEvent.ShowMessage("Testing ${currentApp.title} — QA timer active (60s)"))
+            startMonotonicTicker(currentApp.id)
+        }
     }
 
     private fun startMonotonicTicker(expectedAppId: String) {

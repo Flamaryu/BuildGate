@@ -110,6 +110,7 @@ class QaOverlayService : Service() {
     private var pillLabelView: TextView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var overlayMode: OverlayMode = OverlayMode.COLLAPSED_PILL
+    private var lastRenderedPhase: QaSessionPhase? = null
 
     private var mediaProjection: MediaProjection? = null
     private var activeVirtualDisplay: VirtualDisplay? = null
@@ -880,6 +881,12 @@ class QaOverlayService : Service() {
     }
 
     private fun updatePillAndNotificationText(snap: ActiveQaSessionState) {
+        if (overlayMode == OverlayMode.EXPANDED_MENU && snap.phase != lastRenderedPhase) {
+            lastRenderedPhase = snap.phase
+            rebuildOverlayContent(OverlayMode.EXPANDED_MENU)
+        } else {
+            lastRenderedPhase = snap.phase
+        }
         pillLabelView?.let { pill ->
             val colors = pillColorsFor(snap)
             pill.background = roundedBg(colors.first, colors.second, 24)
