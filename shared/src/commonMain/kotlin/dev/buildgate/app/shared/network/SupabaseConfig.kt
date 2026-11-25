@@ -1,7 +1,12 @@
 package dev.buildgate.app.shared.network
 
 data class SupabaseConfig(
-    val supabaseUrl: String = "https://buildgate.supabase.co",
-    val anonKey: String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.buildgate_anon_token",
-    val authToken: String? = null
-)
+    val supabaseUrl: String = GeneratedSupabaseEnv.SUPABASE_URL,
+    val publishableKey: String = GeneratedSupabaseEnv.SUPABASE_PUBLISHABLE_KEY
+) {
+    val isLiveConfigured: Boolean
+        get() = supabaseUrl.startsWith("https://") &&
+            !supabaseUrl.contains("YOUR_PROJECT_REF") &&
+            publishableKey.isNotBlank() &&
+            !publishableKey.contains("YOUR_KEY_HERE")
+}

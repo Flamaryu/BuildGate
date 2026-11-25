@@ -2,7 +2,7 @@
 
 package dev.buildgate.app.shared.platform
 
-import kotlinx.datetime.Clock
+import dev.buildgate.app.shared.time.BuildGateClock
 
 @JsFun("(url) => { window.open(url, '_blank', 'noopener,noreferrer'); }")
 private external fun wasmOpenExternalUrl(url: String)
@@ -39,7 +39,7 @@ class WasmJsPlatformVerifier : PlatformVerifier {
         wasmCopyText(text)
     }
 
-    override fun monotonicElapsedMs(): Long = Clock.System.now().toEpochMilliseconds()
+    override fun monotonicElapsedMs(): Long = BuildGateClock.nowEpochMs()
 
     override fun captureDeviceMetadata(): DeviceMetadata {
         val w = wasmInnerWidth()

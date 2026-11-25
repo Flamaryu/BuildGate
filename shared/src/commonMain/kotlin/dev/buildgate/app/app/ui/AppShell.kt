@@ -39,6 +39,7 @@ import dev.buildgate.app.features.managemissions.ManageMissionsViewModel
 import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
 import dev.buildgate.app.features.verifysession.VerifySessionViewModel
+import dev.buildgate.app.pages.account.AccountPage
 import dev.buildgate.app.pages.discovery.DiscoveryPage
 import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
@@ -216,15 +217,7 @@ fun AppShell() {
                         }
 
                         composable<BuildGateRoute.Account> {
-                            DiscoveryPage(
-                                appListingRepository = appListingRepo,
-                                enrollmentRepository = enrollmentRepo,
-                                authSession = authSession,
-                                onOpenCampaign = { navigateTo(BuildGateRoute.AppCampaign(it)) },
-                                onOpenDailyQueue = { navigateTo(BuildGateRoute.DailyQueue) },
-                                onOpenPublishWizard = { navigateTo(BuildGateRoute.PublishApp) },
-                                onOpenAccount = {}
-                            )
+                            AccountPage(viewModel = authViewModel)
                         }
                     }
                 }
