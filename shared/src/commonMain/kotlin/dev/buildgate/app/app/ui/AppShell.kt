@@ -49,10 +49,10 @@ import dev.buildgate.app.pages.packet.ProductionPacketPage
 import dev.buildgate.app.pages.publish.PublishAppPage
 import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
+import dev.buildgate.app.app.di.koinScopedViewModel
 import dev.buildgate.app.shared.theme.BuildGateTheme
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun AppShell() {
@@ -61,12 +61,12 @@ fun AppShell() {
             val navController = rememberNavController()
             var activeTab by remember { mutableStateOf(TopLevelTab.DISCOVERY) }
 
-            val authViewModel: AuthViewModel = koinViewModel()
-            val verifySessionViewModel: VerifySessionViewModel = koinViewModel()
-            val triageViewModel: TriageFeedbackViewModel = koinViewModel()
-            val submitViewModel: SubmitFeedbackViewModel = koinViewModel()
-            val missionsViewModel: ManageMissionsViewModel = koinViewModel()
-            val publishAppViewModel: PublishAppViewModel = koinViewModel()
+            val authViewModel: AuthViewModel = koinScopedViewModel()
+            val verifySessionViewModel: VerifySessionViewModel = koinScopedViewModel()
+            val triageViewModel: TriageFeedbackViewModel = koinScopedViewModel()
+            val submitViewModel: SubmitFeedbackViewModel = koinScopedViewModel()
+            val missionsViewModel: ManageMissionsViewModel = koinScopedViewModel()
+            val publishAppViewModel: PublishAppViewModel = koinScopedViewModel()
 
             val appListingRepo: AppListingRepository = koinInject()
             val enrollmentRepo: EnrollmentRepository = koinInject()

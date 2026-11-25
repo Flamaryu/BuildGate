@@ -23,8 +23,12 @@ import dev.buildgate.app.shared.network.SupabaseFeedbackRepository
 import dev.buildgate.app.shared.network.createBuildGateHttpClient
 import dev.buildgate.app.shared.network.createBuildGateSupabaseClientOrNull
 import dev.buildgate.app.shared.platform.getPlatformVerifier
+import androidx.compose.runtime.Composable
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.buildgate.app.shared.session.GlobalQaSession
-import org.koin.core.module.dsl.viewModelOf
+import org.koin.compose.currentKoinScope
+import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 
 val appModule = module {
@@ -54,11 +58,24 @@ val appModule = module {
         if (sb != null) SupabaseFeedbackRepository(sb) else DemoFeedbackRepository()
     }
 
-    // Lifecycle-managed ViewModels
-    viewModelOf(::AuthViewModel)
-    viewModelOf(::VerifySessionViewModel)
-    viewModelOf(::SubmitFeedbackViewModel)
-    viewModelOf(::TriageFeedbackViewModel)
-    viewModelOf(::ManageMissionsViewModel)
-    viewModelOf(::PublishAppViewModel)
+    // Lifecycle-managed ViewModels (instantiated via Compose's viewModel() + Koin scope)
+    factoryOf(::AuthViewModel)
+    factoryOf(::VerifySessionViewModel)
+    factoryOf(::SubmitFeedbackViewModel)
+    factoryOf(::TriageFeedbackViewModel)
+    factoryOf(::ManageMissionsViewModel)
+    factoryOf(::PublishAppViewModel)
+}
+
+/**
+ * Resolves a [ViewModel] from the active Koin scope and retains it inside Compose's
+ * [androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner].
+ *
+ * Compiled directly against the project's lifecycle-viewmodel-compose version to avoid
+ * Koin/Compose WasmJS IR linkage mismatches.
+ */
+@Composable
+inline fun <reified T : ViewModel> koinScopedViewModel(): T {
+    val scope = currentKoinScope()
+    return viewModel<T> { scope.get<T>() }
 }
