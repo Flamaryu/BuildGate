@@ -10,6 +10,7 @@ enum class QaSessionPhase {
     IDLE,
     RUNNING_IN_TARGET_APP,
     PAUSED_FOR_FEEDBACK,
+    PAUSED_TARGET_BACKGROUNDED,
     READY_TO_VERIFY,
     VERIFIED
 }
@@ -25,6 +26,7 @@ data class ActiveQaSessionState(
     val targetDurationMs: Long = 60_000L,
     val accumulatedActiveMs: Long = 0L,
     val segmentStartedRealtimeMs: Long? = null,
+    val sessionLaunchedRealtimeMs: Long = 0L,
     val isHostInBackground: Boolean = false,
     val pauseReason: String? = null,
     val verifiedViaDeepLink: Boolean = false
@@ -100,6 +102,7 @@ class QaSessionCoordinator(
                 targetDurationMs = targetDurationMs,
                 accumulatedActiveMs = 0L,
                 segmentStartedRealtimeMs = now,
+                sessionLaunchedRealtimeMs = now,
                 pauseReason = null,
                 verifiedViaDeepLink = false
             )
@@ -108,10 +111,45 @@ class QaSessionCoordinator(
         }
     }
 
+    fun onTargetForegroundChanged(isForeground: Boolean) {
+        val now = clockRealtimeMs()
+        _state.update { prev ->
+            if (prev.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK) return@update prev
+            if (!isForeground && prev.phase == QaSessionPhase.RUNNING_IN_TARGET_APP) {
+                val banked = prev.currentElapsedMs(now)
+                val next = prev.copy(
+                    phase = QaSessionPhase.PAUSED_TARGET_BACKGROUNDED,
+                    accumulatedActiveMs = banked,
+                    segmentStartedRealtimeMs = null,
+                    pauseReason = "Return to ${prev.activeApp?.title ?: "target app"} to resume timer"
+                )
+                overlayController?.onSessionUpdated(next)
+                next
+            } else if (isForeground && prev.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED) {
+                val nextPhase = if (prev.accumulatedActiveMs >= prev.targetDurationMs) {
+                    QaSessionPhase.READY_TO_VERIFY
+                } else {
+                    QaSessionPhase.RUNNING_IN_TARGET_APP
+                }
+                val next = prev.copy(
+                    phase = nextPhase,
+                    segmentStartedRealtimeMs = if (nextPhase == QaSessionPhase.RUNNING_IN_TARGET_APP) now else null,
+                    pauseReason = null
+                )
+                overlayController?.onSessionUpdated(next)
+                next
+            } else {
+                prev
+            }
+        }
+    }
+
     fun pauseForFeedback(reason: String = "Logging QA Feedback") {
         val now = clockRealtimeMs()
         _state.update { prev ->
-            if (prev.phase != QaSessionPhase.RUNNING_IN_TARGET_APP) return@update prev
+            if (prev.phase != QaSessionPhase.RUNNING_IN_TARGET_APP &&
+                prev.phase != QaSessionPhase.PAUSED_TARGET_BACKGROUNDED
+            ) return@update prev
             val banked = prev.currentElapsedMs(now)
             val next = prev.copy(
                 phase = QaSessionPhase.PAUSED_FOR_FEEDBACK,
@@ -193,6 +231,37 @@ class QaSessionCoordinator(
                 currentQueueIndex = nextIdx,
                 accumulatedActiveMs = 0L,
                 segmentStartedRealtimeMs = null,
+                pauseReason = null,
+                verifiedViaDeepLink = false
+            )
+            overlayController?.onSessionUpdated(updated)
+            updated
+        }
+        return nextApp
+    }
+
+    fun advanceAndStartNextQueuedApp(
+        sessionToken: String,
+        targetDurationMs: Long = 60_000L
+    ): AppListing? {
+        val now = clockRealtimeMs()
+        var nextApp: AppListing? = null
+        _state.update { prev ->
+            if (prev.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK || !prev.hasNextQueuedApp) {
+                return@update prev
+            }
+            val nextIdx = prev.currentQueueIndex + 1
+            nextApp = prev.queueApps[nextIdx]
+            val updated = prev.copy(
+                phase = QaSessionPhase.RUNNING_IN_TARGET_APP,
+                activeApp = nextApp,
+                enrollmentId = null,
+                sessionToken = sessionToken,
+                currentQueueIndex = nextIdx,
+                targetDurationMs = targetDurationMs,
+                accumulatedActiveMs = 0L,
+                segmentStartedRealtimeMs = now,
+                sessionLaunchedRealtimeMs = now,
                 pauseReason = null,
                 verifiedViaDeepLink = false
             )

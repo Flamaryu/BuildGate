@@ -37,12 +37,25 @@ data class OverlayBugSubmission(
     val localPreviewUri: String? = null
 )
 
+data class OverlayVerifyRequest(
+    val appId: String,
+    val appTitle: String,
+    val enrollmentId: String?,
+    val testerId: String,
+    val sessionToken: String,
+    val targetDays: Int,
+    val installedVersionCode: Long?
+)
+
 object QaMediaCaptureBus {
     private val _pendingDraft = MutableStateFlow<CapturedQaMediaDraft?>(null)
     val pendingDraft: StateFlow<CapturedQaMediaDraft?> = _pendingDraft.asStateFlow()
 
     private val _overlaySubmissions = Channel<OverlayBugSubmission>(Channel.BUFFERED)
     val overlaySubmissions = _overlaySubmissions.receiveAsFlow()
+
+    private val _overlayVerifyRequests = Channel<OverlayVerifyRequest>(Channel.BUFFERED)
+    val overlayVerifyRequests = _overlayVerifyRequests.receiveAsFlow()
 
     fun publishCapturedDraft(draft: CapturedQaMediaDraft) {
         _pendingDraft.value = draft
@@ -54,5 +67,9 @@ object QaMediaCaptureBus {
 
     fun submitFromOverlay(submission: OverlayBugSubmission) {
         _overlaySubmissions.trySend(submission)
+    }
+
+    fun requestVerifyFromOverlay(request: OverlayVerifyRequest) {
+        _overlayVerifyRequests.trySend(request)
     }
 }

@@ -36,11 +36,13 @@ data class SessionUiState(
     val missions: List<TestMission> = emptyList(),
     val isSessionRunning: Boolean = false,
     val isSessionPaused: Boolean = false,
+    val isTargetBackgrounded: Boolean = false,
     val secondsRemaining: Int = 60,
     val sessionToken: String = "",
     val isVerifiedToday: Boolean = false,
     val supportsDeviceVerification: Boolean = true,
-    val canDrawOverlays: Boolean = false
+    val canDrawOverlays: Boolean = false,
+    val hasUsageStatsPermission: Boolean = false
 )
 
 sealed interface SessionUiEvent {
@@ -59,7 +61,8 @@ class VerifySessionViewModel(
     private val _uiState = MutableStateFlow(
         SessionUiState(
             supportsDeviceVerification = platformVerifier.supportsDeviceVerification,
-            canDrawOverlays = platformVerifier.canDrawOverlays()
+            canDrawOverlays = platformVerifier.canDrawOverlays(),
+            hasUsageStatsPermission = platformVerifier.hasUsageStatsPermission()
         )
     )
     val uiState: StateFlow<SessionUiState> = _uiState.asStateFlow()
@@ -115,7 +118,8 @@ class VerifySessionViewModel(
                 val verifiedToday = enrollment?.lastVerifiedUtcDate == BuildGateClock.todayUtcDate()
                 val isActiveForThisApp = coordState.activeApp?.id == actualApp.id &&
                     (coordState.phase == QaSessionPhase.RUNNING_IN_TARGET_APP ||
-                     coordState.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK)
+                     coordState.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK ||
+                     coordState.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED)
                 val remSec = if (isActiveForThisApp) {
                     coordState.secondsRemaining(platformVerifier.monotonicElapsedMs())
                 } else {
@@ -130,13 +134,15 @@ class VerifySessionViewModel(
                     missions = missions,
                     isSessionRunning = isActiveForThisApp,
                     isSessionPaused = coordState.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK,
+                    isTargetBackgrounded = coordState.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED,
                     secondsRemaining = remSec,
                     sessionToken = coordState.sessionToken.ifBlank {
                         _uiState.value.sessionToken.ifBlank { "bg_sess_${(100000..999999).random()}" }
                     },
                     isVerifiedToday = verifiedToday,
                     supportsDeviceVerification = platformVerifier.supportsDeviceVerification,
-                    canDrawOverlays = platformVerifier.canDrawOverlays()
+                    canDrawOverlays = platformVerifier.canDrawOverlays(),
+                    hasUsageStatsPermission = platformVerifier.hasUsageStatsPermission()
                 )
             }.collect { combined ->
                 _uiState.value = combined
@@ -151,7 +157,8 @@ class VerifySessionViewModel(
             it.copy(
                 packageInfo = pkgInfo,
                 isInstalled = pkgInfo.isInstalled,
-                canDrawOverlays = platformVerifier.canDrawOverlays()
+                canDrawOverlays = platformVerifier.canDrawOverlays(),
+                hasUsageStatsPermission = platformVerifier.hasUsageStatsPermission()
             )
         }
         if (platformVerifier.supportsDeviceVerification) {
@@ -181,6 +188,10 @@ class VerifySessionViewModel(
 
     fun requestOverlayPermission() {
         platformVerifier.requestOverlayPermission()
+    }
+
+    fun requestUsageStatsPermission() {
+        platformVerifier.requestUsageStatsPermission()
     }
 
     fun pauseSessionForFeedback(reason: String = "Logging QA Bug") {
@@ -248,10 +259,13 @@ class VerifySessionViewModel(
                 if (snap.activeApp?.id != expectedAppId) break
                 if (snap.phase == QaSessionPhase.RUNNING_IN_TARGET_APP) {
                     val rem = snap.secondsRemaining(platformVerifier.monotonicElapsedMs())
-                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = false) }
+                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = false, isTargetBackgrounded = false) }
                 } else if (snap.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK) {
                     val rem = snap.secondsRemaining(platformVerifier.monotonicElapsedMs())
-                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = true) }
+                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = true, isTargetBackgrounded = false) }
+                } else if (snap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED) {
+                    val rem = snap.secondsRemaining(platformVerifier.monotonicElapsedMs())
+                    _uiState.update { it.copy(secondsRemaining = rem, isSessionRunning = true, isSessionPaused = false, isTargetBackgrounded = true) }
                 } else if (snap.phase == QaSessionPhase.READY_TO_VERIFY) {
                     verifyDailySession(method = VerificationMethod.ZERO_SDK_SESSION)
                     break

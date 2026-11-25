@@ -75,12 +75,22 @@ fun DailyQueuePage(
             .mapNotNull { enr -> allListings.find { it.id == enr.appId } }
     }
 
+    val coordinatorState by coordinator.state.collectAsState()
     var currentIndex by remember { mutableIntStateOf(0) }
     val safeIndex = currentIndex.coerceIn(0, (enrolledApps.size - 1).coerceAtLeast(0))
     val currentQueueApp = enrolledApps.getOrNull(safeIndex)
 
+    // Keep queue UI index in sync if tester advanced directly from the Floating QA Overlay pill
+    LaunchedEffect(coordinatorState.currentQueueIndex, enrolledApps.size) {
+        if (coordinatorState.queueApps.isNotEmpty() &&
+            coordinatorState.currentQueueIndex in enrolledApps.indices
+        ) {
+            currentIndex = coordinatorState.currentQueueIndex
+        }
+    }
+
     LaunchedEffect(enrolledApps) {
-        if (enrolledApps.isNotEmpty()) {
+        if (enrolledApps.isNotEmpty() && coordinator.state.value.queueApps.map { it.id } != enrolledApps.map { it.id }) {
             coordinator.startQueue(enrolledApps, testerId)
         }
     }
@@ -240,16 +250,19 @@ fun DailyQueuePage(
                                 verifiedDaysCount = sessionState.enrollment?.currentStreak ?: 0,
                                 isSessionRunning = sessionState.isSessionRunning,
                                 isSessionPaused = sessionState.isSessionPaused,
+                                isTargetBackgrounded = sessionState.isTargetBackgrounded,
                                 secondsRemaining = sessionState.secondsRemaining,
                                 isVerifiedToday = sessionState.isVerifiedToday,
                                 canDrawOverlays = sessionState.canDrawOverlays,
+                                hasUsageStatsPermission = sessionState.hasUsageStatsPermission,
                                 missions = sessionState.missions,
                                 onToggleMission = { verifySessionViewModel.toggleMission(it) },
                                 onStartSessionClick = { verifySessionViewModel.startDailyTestSession() },
                                 onOpenGoogleGroupClick = { verifySessionViewModel.openGoogleGroupAndMarkJoined() },
                                 onOptInClick = { verifySessionViewModel.openPlayOptInAndMarkAccepted() },
                                 onRefreshInstallClick = { verifySessionViewModel.refreshInstallStatus() },
-                                onEnableOverlayClick = { verifySessionViewModel.requestOverlayPermission() }
+                                onEnableOverlayClick = { verifySessionViewModel.requestOverlayPermission() },
+                                onEnableUsageAccessClick = { verifySessionViewModel.requestUsageStatsPermission() }
                             )
                         }
                     }

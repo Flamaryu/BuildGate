@@ -39,9 +39,11 @@ fun DailyCheckInCard(
     verifiedDaysCount: Int,
     isSessionRunning: Boolean,
     isSessionPaused: Boolean = false,
+    isTargetBackgrounded: Boolean = false,
     secondsRemaining: Int,
     isVerifiedToday: Boolean,
     canDrawOverlays: Boolean = false,
+    hasUsageStatsPermission: Boolean = false,
     missions: List<TestMission>,
     onToggleMission: (String) -> Unit,
     onStartSessionClick: () -> Unit,
@@ -49,6 +51,7 @@ fun DailyCheckInCard(
     onOptInClick: () -> Unit,
     onRefreshInstallClick: () -> Unit = {},
     onEnableOverlayClick: () -> Unit = {},
+    onEnableUsageAccessClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -187,6 +190,44 @@ fun DailyCheckInCard(
                 }
             }
 
+            // Optional Foreground Usage Verification Strip (Anti-Cheat without Deep Links)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasUsageStatsPermission) {
+                            "🛡️ Strict Foreground Verification Active"
+                        } else {
+                            "🛡️ Foreground Anti-Cheat (Usage Access)"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (hasUsageStatsPermission) {
+                            "Timer automatically pauses if ${app.title} is backgrounded or screen locks."
+                        } else {
+                            "Optional: Grant Usage Access to verify the target app stays on screen for the full 60s."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!hasUsageStatsPermission) {
+                    TextButton(onClick = onEnableUsageAccessClick) {
+                        Text("Enable")
+                    }
+                }
+            }
+
             HorizontalDivider()
 
             // 14-Day Progress Bar
@@ -268,14 +309,14 @@ fun DailyCheckInCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (isSessionPaused) {
-                            "⏸️ Session Paused for QA Bug Logging ($secondsRemaining s remaining — Queue Held)"
-                        } else {
-                            "⏱️ Active in Target App: $secondsRemaining s remaining"
+                        text = when {
+                            isSessionPaused -> "⏸️ Session Paused for QA Bug Logging ($secondsRemaining s remaining — Queue Held)"
+                            isTargetBackgrounded -> "⏸️ Timer Paused — Return to ${app.title} to resume ($secondsRemaining s left)"
+                            else -> "⏱️ Active in Target App: $secondsRemaining s remaining"
                         },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isSessionPaused) MaterialTheme.colorScheme.onSecondaryContainer
+                        color = if (isSessionPaused || isTargetBackgrounded) MaterialTheme.colorScheme.onSecondaryContainer
                         else MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }

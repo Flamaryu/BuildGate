@@ -44,6 +44,7 @@ import dev.buildgate.app.shared.session.ActiveQaSessionState
 import dev.buildgate.app.shared.session.CapturedQaMediaDraft
 import dev.buildgate.app.shared.session.GlobalQaSession
 import dev.buildgate.app.shared.session.OverlayBugSubmission
+import dev.buildgate.app.shared.session.OverlayVerifyRequest
 import dev.buildgate.app.shared.session.QaMediaCaptureBus
 import dev.buildgate.app.shared.session.QaOverlayController
 import dev.buildgate.app.shared.session.QaSessionPhase
@@ -68,6 +69,7 @@ class QaOverlayService : Service() {
         const val ACTION_RECORD_CLIP_15S = "dev.buildgate.app.overlay.RECORD_CLIP_15S"
         const val ACTION_STOP_RECORDING = "dev.buildgate.app.overlay.STOP_RECORDING"
         const val ACTION_GRANT_PROJECTION = "dev.buildgate.app.overlay.GRANT_PROJECTION"
+        const val ACTION_VERIFY_AND_LAUNCH_NEXT = "dev.buildgate.app.overlay.VERIFY_AND_LAUNCH_NEXT"
         const val ACTION_STOP_SERVICE = "dev.buildgate.app.overlay.STOP_SERVICE"
 
         const val EXTRA_PROJECTION_RESULT_CODE = "projection_result_code"
@@ -123,6 +125,21 @@ class QaOverlayService : Service() {
 
     private val tickerRunnable = object : Runnable {
         override fun run() {
+            val preSnap = GlobalQaSession.coordinator.state.value
+            val activePkg = preSnap.activeApp?.packageName
+            if (!activePkg.isNullOrBlank() &&
+                (preSnap.phase == QaSessionPhase.RUNNING_IN_TARGET_APP ||
+                 preSnap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED)
+            ) {
+                // Allow a 3s grace period right after launch while Android transitions to the target app
+                val sinceLaunchMs = SystemClock.elapsedRealtime() - preSnap.sessionLaunchedRealtimeMs
+                if (sinceLaunchMs >= 3_000L) {
+                    val inForeground = getPlatformVerifier().isPackageInForeground(activePkg)
+                    if (inForeground != null) {
+                        GlobalQaSession.coordinator.onTargetForegroundChanged(inForeground)
+                    }
+                }
+            }
             val snap = GlobalQaSession.coordinator.evaluateProgress()
             updatePillAndNotificationText(snap)
             if (snap.phase != QaSessionPhase.IDLE) {
@@ -223,6 +240,9 @@ class QaOverlayService : Service() {
             }
             ACTION_STOP_RECORDING -> {
                 stopScreenClipAndOpenBugSheet()
+            }
+            ACTION_VERIFY_AND_LAUNCH_NEXT -> {
+                verifyCurrentAndLaunchNextApp()
             }
         }
 
@@ -484,10 +504,11 @@ class QaOverlayService : Service() {
 
         when (mode) {
             OverlayMode.COLLAPSED_PILL -> {
+                val pillColors = pillColorsFor(snap)
                 val pill = TextView(this).apply {
                     background = roundedBg(
-                        fillColor = if (isRecordingClip) Color.parseColor("#B91C1C") else Color.parseColor("#1E1B4B"),
-                        strokeColor = Color.parseColor("#818CF8"),
+                        fillColor = pillColors.first,
+                        strokeColor = pillColors.second,
                         radiusDp = 24
                     )
                     setTextColor(Color.WHITE)
@@ -523,6 +544,46 @@ class QaOverlayService : Service() {
                 }
                 card.addView(header)
 
+                val isReadyForNext = (snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED)
+                val nextQueued = snap.nextQueuedApp
+                if (isReadyForNext && nextQueued != null) {
+                    val nextBtn = Button(this).apply {
+                        text = "✅ Verify & Launch Next: ${nextQueued.title.substringBefore(":")} ➔"
+                        isAllCaps = false
+                        setTextColor(Color.WHITE)
+                        typeface = Typeface.DEFAULT_BOLD
+                        textSize = 12.5f
+                        background = roundedBg(Color.parseColor("#059669"), Color.parseColor("#34D399"), 12)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = dp(8) }
+                        setOnClickListener { verifyCurrentAndLaunchNextApp() }
+                    }
+                    card.addView(nextBtn)
+                } else if (snap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED && snap.activeApp != null) {
+                    val returnTargetBtn = Button(this).apply {
+                        text = "▶️ Return to ${appTitle.substringBefore(":")} to Resume"
+                        isAllCaps = false
+                        setTextColor(Color.WHITE)
+                        typeface = Typeface.DEFAULT_BOLD
+                        textSize = 12.5f
+                        background = roundedBg(Color.parseColor("#B45309"), Color.parseColor("#FBBF24"), 12)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = dp(8) }
+                        setOnClickListener {
+                            val active = snap.activeApp ?: return@setOnClickListener
+                            getPlatformVerifier().launchTargetApp(active.packageName, snap.sessionToken, active.deepLinkScheme)
+                            switchOverlayMode(OverlayMode.COLLAPSED_PILL)
+                        }
+                    }
+                    card.addView(returnTargetBtn)
+                }
+
                 card.addView(menuButton("📸 1-Tap Screenshot & Pause") {
                     if (mediaProjection == null) requestMediaProjectionConsent(ACTION_CAPTURE_SCREENSHOT)
                     else captureOneTapScreenshot()
@@ -535,7 +596,12 @@ class QaOverlayService : Service() {
                     GlobalQaSession.coordinator.pauseForFeedback("Quick Bug Note")
                     switchOverlayMode(OverlayMode.INLINE_BUG_SHEET)
                 })
-                card.addView(menuButton("⏭️ Return to BuildGate Queue") {
+                if (!isReadyForNext && nextQueued != null) {
+                    card.addView(menuButton("⏭️ Skip to Next: ${nextQueued.title.substringBefore(":")}") {
+                        launchNextQueuedAppDirectly(verifyCurrent = false)
+                    })
+                }
+                card.addView(menuButton("🏠 Return to BuildGate Queue") {
                     openBuildGateQueueScreen()
                     switchOverlayMode(OverlayMode.COLLAPSED_PILL)
                 })
@@ -714,23 +780,85 @@ class QaOverlayService : Service() {
         }
     }
 
+    private fun pillColorsFor(snap: ActiveQaSessionState): Pair<Int, Int> = when {
+        isRecordingClip -> Color.parseColor("#B91C1C") to Color.parseColor("#FCA5A5")
+        snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED ->
+            Color.parseColor("#065F46") to Color.parseColor("#34D399")
+        snap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED ->
+            Color.parseColor("#92400E") to Color.parseColor("#FBBF24")
+        snap.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK ->
+            Color.parseColor("#3730A3") to Color.parseColor("#A5B4FC")
+        else -> Color.parseColor("#1E1B4B") to Color.parseColor("#818CF8")
+    }
+
+    private fun verifyCurrentAndLaunchNextApp() = launchNextQueuedAppDirectly(verifyCurrent = true)
+
+    private fun launchNextQueuedAppDirectly(verifyCurrent: Boolean) {
+        val snap = GlobalQaSession.coordinator.state.value
+        val currentApp = snap.activeApp
+        if (verifyCurrent && currentApp != null) {
+            val verifier = getPlatformVerifier()
+            val pkgInfo = verifier.inspectInstalledApp(currentApp.packageName)
+            QaMediaCaptureBus.requestVerifyFromOverlay(
+                OverlayVerifyRequest(
+                    appId = currentApp.id,
+                    appTitle = currentApp.title,
+                    enrollmentId = snap.enrollmentId,
+                    testerId = snap.testerId ?: "tester_1",
+                    sessionToken = snap.sessionToken.ifBlank { "bg_sess_${(100000..999999).random()}" },
+                    targetDays = currentApp.targetDays,
+                    installedVersionCode = pkgInfo.versionCode
+                )
+            )
+            GlobalQaSession.coordinator.markVerified(viaDeepLink = false)
+        }
+
+        val newToken = "bg_sess_${(100000..999999).random()}"
+        val nextApp = GlobalQaSession.coordinator.advanceAndStartNextQueuedApp(
+            sessionToken = newToken,
+            targetDurationMs = 60_000L
+        )
+        if (nextApp != null) {
+            val launched = getPlatformVerifier().launchTargetApp(
+                packageName = nextApp.packageName,
+                sessionToken = newToken,
+                deepLinkScheme = nextApp.deepLinkScheme
+            )
+            switchOverlayMode(OverlayMode.COLLAPSED_PILL)
+            if (!launched) {
+                openBuildGateQueueScreen()
+            }
+        } else {
+            openBuildGateQueueScreen()
+            switchOverlayMode(OverlayMode.COLLAPSED_PILL)
+        }
+    }
+
     private fun formatCollapsedText(snap: ActiveQaSessionState): String {
         if (isRecordingClip) {
             val recSec = ((MAX_CLIP_DURATION_MS - (SystemClock.elapsedRealtime() - recordingStartedAtMs)).coerceAtLeast(0L) / 1000L).toInt()
             return "🔴 REC ${recSec}s (Tap Stop)"
         }
-        val shortTitle = snap.activeApp?.title?.substringBefore(" ") ?: "QA"
+        val shortTitle = snap.activeApp?.title?.substringBefore(":")?.substringBefore(" ") ?: "QA"
         val rem = snap.secondsRemaining(SystemClock.elapsedRealtime())
         return when (snap.phase) {
             QaSessionPhase.PAUSED_FOR_FEEDBACK -> "⏸️ Paused • $shortTitle"
-            QaSessionPhase.READY_TO_VERIFY, QaSessionPhase.VERIFIED -> "✅ $shortTitle Verified!"
+            QaSessionPhase.PAUSED_TARGET_BACKGROUNDED -> "⏸️ Open $shortTitle • ${rem}s"
+            QaSessionPhase.READY_TO_VERIFY, QaSessionPhase.VERIFIED -> {
+                val nextShort = snap.nextQueuedApp?.title?.substringBefore(":")
+                if (nextShort != null) "✅ Done • Next: $nextShort ➔" else "✅ $shortTitle Verified!"
+            }
             QaSessionPhase.RUNNING_IN_TARGET_APP -> "⚡ ${rem}s • $shortTitle"
             QaSessionPhase.IDLE -> "⚡ BuildGate QA"
         }
     }
 
     private fun updatePillAndNotificationText(snap: ActiveQaSessionState) {
-        pillLabelView?.text = formatCollapsedText(snap)
+        pillLabelView?.let { pill ->
+            val colors = pillColorsFor(snap)
+            pill.background = roundedBg(colors.first, colors.second, 24)
+            pill.text = formatCollapsedText(snap)
+        }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         nm?.notify(NOTIFICATION_ID, buildNotification(snap))
     }
@@ -742,8 +870,12 @@ class QaOverlayService : Service() {
         val statusLine = when {
             isRecordingClip -> "Recording 15s bug clip — tap Stop Clip when done"
             snap.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK -> "Paused ($rem s left) • Queue held while logging bug"
-            snap.phase == QaSessionPhase.VERIFIED || snap.phase == QaSessionPhase.READY_TO_VERIFY ->
-                "60s Verified! Return to BuildGate to claim Karma or run next app"
+            snap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED -> "Timer paused ($rem s left) • Re-open $appTitle to continue"
+            snap.phase == QaSessionPhase.VERIFIED || snap.phase == QaSessionPhase.READY_TO_VERIFY -> {
+                val nextName = snap.nextQueuedApp?.title
+                if (nextName != null) "60s Verified! Tap Verify & Next to launch $nextName"
+                else "60s Verified! Return to BuildGate to claim Karma"
+            }
             else -> "Keep $appTitle active ($rem s left) • Use overlay or actions below to log bugs"
         }
 
@@ -781,13 +913,28 @@ class QaOverlayService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val isReadyForNext = (snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED) && snap.hasNextQueuedApp
+        val nextIntent = Intent(this, QaOverlayService::class.java).apply {
+            action = ACTION_VERIFY_AND_LAUNCH_NEXT
+        }
+        val nextPending = PendingIntent.getService(
+            this,
+            103,
+            nextIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentTitle("BuildGate QA • $appTitle")
             .setContentText(statusLine)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openQueuePending)
+        if (isReadyForNext) {
+            builder.addAction(0, "Verify & Next App ➔", nextPending)
+        }
+        return builder
             .addAction(
                 0,
                 if (snap.phase == QaSessionPhase.PAUSED_FOR_FEEDBACK) "Resume Timer" else "Pause & Log Bug",

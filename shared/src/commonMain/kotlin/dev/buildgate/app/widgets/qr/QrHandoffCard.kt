@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,13 +54,13 @@ fun QrHandoffCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(132.dp)
+                        .size(164.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color.White)
                         .padding(10.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    DeterministicQrMatrix(payload = shareableUrl)
+                    ScannableQrCode(payload = androidDeepLink)
                 }
 
                 Column(
@@ -122,43 +123,21 @@ fun QrHandoffCard(
 }
 
 @Composable
-private fun DeterministicQrMatrix(payload: String) {
-    val gridSize = 21
-    Canvas(modifier = Modifier.size(112.dp)) {
-        val cell = size.width / gridSize
+private fun ScannableQrCode(payload: String) {
+    val matrix = remember(payload) { QrCodeEncoder.encode(payload) }
+    val quietZone = 2
+    val totalModules = matrix.size + quietZone * 2
 
-        fun isFinderModule(r: Int, c: Int): Boolean {
-            fun inCorner(r0: Int, c0: Int): Boolean {
-                val dr = r - r0
-                val dc = c - c0
-                if (dr !in 0..6 || dc !in 0..6) return false
-                return dr == 0 || dr == 6 || dc == 0 || dc == 6 || (dr in 2..4 && dc in 2..4)
-            }
-            return inCorner(0, 0) || inCorner(0, gridSize - 7) || inCorner(gridSize - 7, 0)
-        }
-
-        fun inFinderQuiet(r: Int, c: Int): Boolean {
-            return (r <= 7 && c <= 7) ||
-                (r <= 7 && c >= gridSize - 8) ||
-                (r >= gridSize - 8 && c <= 7)
-        }
-
-        val hashSeed = payload.hashCode()
-        for (r in 0 until gridSize) {
-            for (c in 0 until gridSize) {
-                val dark = when {
-                    isFinderModule(r, c) -> true
-                    inFinderQuiet(r, c) -> false
-                    else -> {
-                        val charCode = payload[(r * gridSize + c) % payload.length.coerceAtLeast(1)].code
-                        ((charCode * 31 + r * 17 + c * 13 + hashSeed) and 1) == 0
-                    }
-                }
-                if (dark) {
+    Canvas(modifier = Modifier.size(144.dp)) {
+        val cell = size.width / totalModules
+        drawRect(color = Color.White, size = size)
+        for (r in 0 until matrix.size) {
+            for (c in 0 until matrix.size) {
+                if (matrix.get(r, c)) {
                     drawRect(
-                        color = Color(0xFF121218),
-                        topLeft = Offset(c * cell, r * cell),
-                        size = Size(cell, cell)
+                        color = Color.Black,
+                        topLeft = Offset((c + quietZone) * cell, (r + quietZone) * cell),
+                        size = Size(cell + 0.35f, cell + 0.35f)
                     )
                 }
             }

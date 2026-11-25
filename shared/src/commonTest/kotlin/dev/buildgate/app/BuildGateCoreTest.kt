@@ -219,6 +219,58 @@ class BuildGateCoreTest {
         app.close()
     }
 
+    @Test
+    fun qaSessionCoordinator_pausesWhenTargetBackgrounded_andAdvancesDirectlyToNextApp() {
+        var fakeNowMs = 1_000L
+        val coordinator = QaSessionCoordinator { fakeNowMs }
+
+        val app1 = sampleApp("app_1", "com.mkdinteractive.shatterhorde")
+        val app2 = sampleApp("app_2", "com.cozybento.bento_puzzle")
+        coordinator.startQueue(listOf(app1, app2), testerId = "tester_1")
+        coordinator.startAppSession(
+            app = app1,
+            enrollmentId = "enr_1",
+            testerId = "tester_1",
+            sessionToken = "bg_nonce_1",
+            targetDurationMs = 60_000L
+        )
+
+        // 20s in foreground
+        fakeNowMs = 21_000L
+        assertEquals(40, coordinator.state.value.secondsRemaining(fakeNowMs))
+
+        // User backgrounds target app -> timer freezes!
+        coordinator.onTargetForegroundChanged(isForeground = false)
+        assertEquals(QaSessionPhase.PAUSED_TARGET_BACKGROUNDED, coordinator.state.value.phase)
+        fakeNowMs = 121_000L // 100s spent on Home screen
+        assertEquals(40, coordinator.state.value.secondsRemaining(fakeNowMs))
+
+        // User returns to target app -> finishes remaining 40s
+        coordinator.onTargetForegroundChanged(isForeground = true)
+        assertEquals(QaSessionPhase.RUNNING_IN_TARGET_APP, coordinator.state.value.phase)
+        fakeNowMs = 162_000L
+        assertEquals(QaSessionPhase.READY_TO_VERIFY, coordinator.evaluateProgress().phase)
+
+        // Direct overlay launch of next queued app
+        val next = coordinator.advanceAndStartNextQueuedApp(sessionToken = "bg_nonce_2")
+        assertEquals("app_2", next?.id)
+        assertEquals(QaSessionPhase.RUNNING_IN_TARGET_APP, coordinator.state.value.phase)
+        assertEquals(1, coordinator.state.value.currentQueueIndex)
+    }
+
+    @Test
+    fun qrCodeEncoder_generatesValidIsoMatrixForDeepLink() {
+        val matrix = dev.buildgate.app.widgets.qr.QrCodeEncoder.encode("buildgate://app/com.mkdinteractive.shatterhorde")
+        assertTrue(matrix.size >= 29) // Version 3+ for 47-byte payload at EC-M
+        assertEquals(matrix.size * matrix.size, matrix.modules.size)
+        // Top-left finder pattern center & outer ring must be dark
+        assertTrue(matrix.get(0, 0))
+        assertTrue(matrix.get(3, 3))
+        assertFalse(matrix.get(1, 1))
+        // Mandatory dark module at (size - 8, 8)
+        assertTrue(matrix.get(matrix.size - 8, 8))
+    }
+
     private fun sampleApp(id: String, pkg: String) = AppListing(
         id = id,
         ownerId = "owner_1",

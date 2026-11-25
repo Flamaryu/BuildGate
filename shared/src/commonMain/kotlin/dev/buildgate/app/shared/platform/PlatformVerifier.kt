@@ -25,6 +25,14 @@ interface PlatformVerifier {
     fun canDrawOverlays(): Boolean = false
     fun requestOverlayPermission() {}
 
+    fun hasUsageStatsPermission(): Boolean = false
+    fun requestUsageStatsPermission() {}
+    /**
+     * Returns true if [packageName] is currently the foreground app (when Usage Access is granted),
+     * false if another app / home screen / lock screen is active, or null if unavailable.
+     */
+    fun isPackageInForeground(packageName: String): Boolean? = null
+
     fun monotonicElapsedMs(): Long
     fun captureDeviceMetadata(): DeviceMetadata
 }

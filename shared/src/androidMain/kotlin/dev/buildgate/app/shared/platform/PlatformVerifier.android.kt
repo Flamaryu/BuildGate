@@ -1,5 +1,8 @@
 package dev.buildgate.app.shared.platform
 
+import android.app.AppOpsManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -7,6 +10,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 
@@ -118,6 +123,61 @@ class AndroidPlatformVerifier(
             }
             context.startActivity(intent)
         }
+    }
+
+    override fun hasUsageStatsPermission(): Boolean {
+        val context = contextProvider() ?: return false
+        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return false
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
+        }
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    override fun requestUsageStatsPermission() {
+        val context = contextProvider() ?: return
+        runCatching {
+            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
+    }
+
+    override fun isPackageInForeground(packageName: String): Boolean? {
+        val context = contextProvider() ?: return null
+        if (!hasUsageStatsPermission()) return null
+
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (powerManager != null && !powerManager.isInteractive) return false
+
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return null
+        val now = System.currentTimeMillis()
+        // Query last 10 minutes so staying in a single game Activity for >60s still reports it as foreground
+        val events = usm.queryEvents(now - 600_000L, now) ?: return null
+        val event = UsageEvents.Event()
+        var lastForegroundPkg: String? = null
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            @Suppress("DEPRECATION")
+            val isResumed = event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
+                event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
+            if (isResumed && !event.packageName.isNullOrBlank()) {
+                lastForegroundPkg = event.packageName
+            }
+        }
+        return lastForegroundPkg == packageName
     }
 
     override fun monotonicElapsedMs(): Long = SystemClock.elapsedRealtime()

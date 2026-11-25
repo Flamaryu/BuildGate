@@ -124,6 +124,32 @@ fun AppShell() {
                 }
             }
 
+            // Persist daily verifications triggered directly from the Floating QA Overlay's "Verify & Next" button
+            LaunchedEffect(currentUserId) {
+                QaMediaCaptureBus.overlayVerifyRequests.collect { req ->
+                    val tester = req.testerId.ifBlank { currentUserId }
+                    val enrollment = enrollmentRepo.getEnrollment(req.appId, tester)
+                        ?: enrollmentRepo.enrollInApp(req.appId, tester)
+                    val outcome = enrollmentRepo.recordDailyVerification(
+                        enrollmentId = enrollment.id,
+                        sessionToken = req.sessionToken,
+                        activeDurationSeconds = 60,
+                        method = dev.buildgate.app.entities.dailyverification.model.VerificationMethod.ZERO_SDK_SESSION,
+                        targetDays = req.targetDays,
+                        installedVersionCode = req.installedVersionCode
+                    )
+                    if (!outcome.alreadyVerifiedToday && outcome.karmaEarned > 0) {
+                        authRepo.awardKarma(
+                            userId = tester,
+                            delta = outcome.karmaEarned,
+                            reason = dev.buildgate.app.entities.testerprofile.model.KarmaReason.DAILY_VERIFICATION,
+                            appId = req.appId,
+                            note = "Day ${outcome.dayNumber}/${req.targetDays} verified via QA Overlay for ${req.appTitle}"
+                        )
+                    }
+                }
+            }
+
             fun navigateTo(route: BuildGateRoute) {
                 activeTab = when (route) {
                     BuildGateRoute.Discovery -> TopLevelTab.DISCOVERY

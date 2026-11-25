@@ -134,16 +134,19 @@ fun SessionVerificationPage(
                         verifiedDaysCount = state.enrollment?.currentStreak ?: 0,
                         isSessionRunning = state.isSessionRunning,
                         isSessionPaused = state.isSessionPaused,
+                        isTargetBackgrounded = state.isTargetBackgrounded,
                         secondsRemaining = state.secondsRemaining,
                         isVerifiedToday = state.isVerifiedToday,
                         canDrawOverlays = state.canDrawOverlays,
+                        hasUsageStatsPermission = state.hasUsageStatsPermission,
                         missions = state.missions,
                         onToggleMission = { viewModel.toggleMission(it) },
                         onStartSessionClick = { viewModel.startDailyTestSession() },
                         onOpenGoogleGroupClick = { viewModel.openGoogleGroupAndMarkJoined() },
                         onOptInClick = { viewModel.openPlayOptInAndMarkAccepted() },
                         onRefreshInstallClick = { viewModel.refreshInstallStatus() },
-                        onEnableOverlayClick = { viewModel.requestOverlayPermission() }
+                        onEnableOverlayClick = { viewModel.requestOverlayPermission() },
+                        onEnableUsageAccessClick = { viewModel.requestUsageStatsPermission() }
                     )
                 }
 
