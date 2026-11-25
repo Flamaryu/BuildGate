@@ -40,6 +40,7 @@ import dev.buildgate.app.features.submitfeedback.SubmitFeedbackViewModel
 import dev.buildgate.app.features.triagefeedback.TriageFeedbackViewModel
 import dev.buildgate.app.features.verifysession.VerifySessionViewModel
 import dev.buildgate.app.pages.account.AccountPage
+import dev.buildgate.app.pages.dailyqueue.DailyQueuePage
 import dev.buildgate.app.pages.discovery.DiscoveryPage
 import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
@@ -180,14 +181,18 @@ fun AppShell() {
                             )
                         }
 
-                        // Placeholders wired cleanly in Phases 5-8
                         composable<BuildGateRoute.DailyQueue> {
-                            SessionVerificationPage(
-                                appId = "app_1",
+                            DailyQueuePage(
                                 testerId = currentUserId,
-                                viewModel = verifySessionViewModel,
-                                onNavigateBack = { navigateTo(BuildGateRoute.Discovery) },
-                                onOpenTriageBoard = { navigateTo(BuildGateRoute.TriageBoard(it)) }
+                                appListingRepository = appListingRepo,
+                                enrollmentRepository = enrollmentRepo,
+                                verifySessionViewModel = verifySessionViewModel,
+                                onOpenTriageForApp = { appId ->
+                                    navigateTo(BuildGateRoute.TriageBoard(appId))
+                                },
+                                onBrowseDiscovery = {
+                                    navigateTo(BuildGateRoute.Discovery)
+                                }
                             )
                         }
 

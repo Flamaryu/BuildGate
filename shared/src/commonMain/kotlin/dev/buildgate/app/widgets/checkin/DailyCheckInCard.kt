@@ -14,10 +14,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,14 +33,22 @@ import dev.buildgate.app.entities.testmission.model.TestMission
 fun DailyCheckInCard(
     app: AppListing,
     isInstalled: Boolean,
+    installedVersionLabel: String? = null,
+    hasJoinedGoogleGroup: Boolean = false,
+    hasAcceptedPlayOptIn: Boolean = false,
     verifiedDaysCount: Int,
     isSessionRunning: Boolean,
+    isSessionPaused: Boolean = false,
     secondsRemaining: Int,
     isVerifiedToday: Boolean,
+    canDrawOverlays: Boolean = false,
     missions: List<TestMission>,
     onToggleMission: (String) -> Unit,
     onStartSessionClick: () -> Unit,
+    onOpenGoogleGroupClick: () -> Unit = {},
     onOptInClick: () -> Unit,
+    onRefreshInstallClick: () -> Unit = {},
+    onEnableOverlayClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -58,7 +68,7 @@ fun DailyCheckInCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = app.title,
                         style = MaterialTheme.typography.titleLarge,
@@ -66,8 +76,16 @@ fun DailyCheckInCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Build ${missions.firstOrNull()?.buildVersion ?: "v1.0.4"}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = buildString {
+                            append("Target Build ${app.currentBuildVersion}")
+                            if (!installedVersionLabel.isNullOrBlank()) {
+                                append(" • Installed $installedVersionLabel")
+                            }
+                            if (app.hasDeepLinkHandshake) {
+                                append(" • 🔗 Deep-Link Verified")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -87,6 +105,90 @@ fun DailyCheckInCard(
                 }
             }
 
+            // Guided 3-Step Closed-Testing Onboarding Stepper
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "3-Step Closed Testing Onboarding",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                OnboardingStepRow(
+                    stepNumber = 1,
+                    title = "Join Developer's Google Group",
+                    subtitle = "Unlocks Google Play Closed Test access for your Google email",
+                    isComplete = hasJoinedGoogleGroup || isInstalled,
+                    actionText = if (hasJoinedGoogleGroup) "Open Again" else "Join Group ➔",
+                    onClick = onOpenGoogleGroupClick
+                )
+
+                OnboardingStepRow(
+                    stepNumber = 2,
+                    title = "Accept Google Play Web Opt-In",
+                    subtitle = "Click 'Become a Tester' on Play Store testing page",
+                    isComplete = hasAcceptedPlayOptIn || isInstalled,
+                    actionText = if (hasAcceptedPlayOptIn) "Play Link" else "Opt-In ➔",
+                    onClick = onOptInClick
+                )
+
+                OnboardingStepRow(
+                    stepNumber = 3,
+                    title = "Install App & Auto-Detect Package",
+                    subtitle = app.packageName,
+                    isComplete = isInstalled,
+                    actionText = if (isInstalled) "Verified ✅" else "Re-check",
+                    onClick = onRefreshInstallClick
+                )
+            }
+
+            // Floating QA Overlay Quick Enable Strip
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (canDrawOverlays) {
+                            "🟢 Floating QA Overlay Pill Enabled"
+                        } else {
+                            "💡 Floating QA Pill (1-Tap Bug, Screenshot & 15s Clip)"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (canDrawOverlays) {
+                            "Tap the floating pill inside ${app.title} to pause & log bugs anytime."
+                        } else {
+                            "Optional: Enable overlay for in-app capture (Ongoing Notification fallback is always active)."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!canDrawOverlays) {
+                    TextButton(onClick = onEnableOverlayClick) {
+                        Text("Enable")
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
             // 14-Day Progress Bar
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
@@ -94,19 +196,19 @@ fun DailyCheckInCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "14-Day Play Verification",
+                        text = "14-Day Continuity Streak (1-Day Grace Active)",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Day $verifiedDaysCount / 14",
+                        text = "Day $verifiedDaysCount / ${app.targetDays}",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
                 LinearProgressIndicator(
-                    progress = { verifiedDaysCount / 14f },
+                    progress = { (verifiedDaysCount.toFloat() / app.targetDays.toFloat()).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(6.dp)),
@@ -119,7 +221,7 @@ fun DailyCheckInCard(
             if (missions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Today's Developer Missions:",
+                        text = "Today's Developer QA Missions:",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -152,21 +254,29 @@ fun DailyCheckInCard(
                 }
             }
 
-            // Timer & Verification Status
+            // Timer & Pause-Aware Status
             AnimatedVisibility(visible = isSessionRunning) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .background(
+                            if (isSessionPaused) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.primaryContainer
+                        )
                         .padding(14.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "⏱️ Session Active: Keep target app open ($secondsRemaining s)",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = if (isSessionPaused) {
+                            "⏸️ Session Paused for QA Bug Logging ($secondsRemaining s remaining — Queue Held)"
+                        } else {
+                            "⏱️ Active in Target App: $secondsRemaining s remaining"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = if (isSessionPaused) MaterialTheme.colorScheme.onSecondaryContainer
+                        else MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
@@ -181,7 +291,7 @@ fun DailyCheckInCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "🎉 Verified Today! +25 Karma Earned!",
+                        text = "🎉 Verified Today! +${if (app.hasDeepLinkHandshake) 15 else 10} Karma Earned!",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -200,7 +310,7 @@ fun DailyCheckInCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Text("Opt-In & Install")
+                        Text("Install on Google Play")
                     }
                 }
 
@@ -213,9 +323,64 @@ fun DailyCheckInCard(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text(if (isSessionRunning) "Session Running..." else if (isVerifiedToday) "Verified Today" else "Start Daily Test")
+                    Text(
+                        when {
+                            isSessionPaused -> "Paused for Bug Log..."
+                            isSessionRunning -> "Testing Active ($secondsRemaining s)..."
+                            isVerifiedToday -> "Verified Today ✅"
+                            else -> "Launch & Start 60s Check-In"
+                        }
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingStepRow(
+    stepNumber: Int,
+    title: String,
+    subtitle: String,
+    isComplete: Boolean,
+    actionText: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isComplete) "✅" else "$stepNumber.",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        OutlinedButton(
+            onClick = onClick,
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text(actionText, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

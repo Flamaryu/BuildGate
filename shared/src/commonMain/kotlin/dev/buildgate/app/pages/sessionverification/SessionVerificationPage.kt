@@ -22,13 +22,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.buildgate.app.app.navigation.DeepLinkRouter
 import dev.buildgate.app.features.verifysession.SessionUiEvent
 import dev.buildgate.app.features.verifysession.VerifySessionViewModel
+import dev.buildgate.app.shared.platform.PlatformVerifier
 import dev.buildgate.app.widgets.checkin.DailyCheckInCard
+import dev.buildgate.app.widgets.qr.QrHandoffCard
+import dev.buildgate.app.widgets.retention.RetentionTracker14Day
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +48,8 @@ fun SessionVerificationPage(
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val platformVerifier: PlatformVerifier = koinInject()
 
     LaunchedEffect(appId, testerId) {
         viewModel.loadSessionForApp(appId, testerId)
@@ -83,7 +91,7 @@ fun SessionVerificationPage(
                 actions = {
                     state.selectedApp?.let { app ->
                         TextButton(onClick = { onOpenTriageBoard(app.id) }) {
-                            Text("Open QA & Bugs ➔")
+                            Text("QA & Bugs ➔")
                         }
                     }
                 }
@@ -103,17 +111,45 @@ fun SessionVerificationPage(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (selectedApp != null) {
-                DailyCheckInCard(
-                    app = selectedApp,
-                    isInstalled = state.isInstalled,
+                if (!state.supportsDeviceVerification) {
+                    val shareUrl = DeepLinkRouter.buildShareableCampaignUrl(selectedApp.packageName)
+                    QrHandoffCard(
+                        appTitle = selectedApp.title,
+                        shareableUrl = shareUrl,
+                        androidDeepLink = DeepLinkRouter.buildAndroidDeepLinkUrl(selectedApp.packageName),
+                        onCopyUrl = {
+                            platformVerifier.copyToClipboard("Campaign Link", shareUrl)
+                            scope.launch { snackbarHostState.showSnackbar("Copied $shareUrl") }
+                        },
+                        onOpenGoogleGroup = { viewModel.openGoogleGroupAndMarkJoined() },
+                        onOpenPlayOptIn = { viewModel.openPlayOptInAndMarkAccepted() }
+                    )
+                } else {
+                    DailyCheckInCard(
+                        app = selectedApp,
+                        isInstalled = state.isInstalled,
+                        installedVersionLabel = state.packageInfo.versionName,
+                        hasJoinedGoogleGroup = state.enrollment?.hasJoinedGoogleGroup ?: false,
+                        hasAcceptedPlayOptIn = state.enrollment?.hasAcceptedPlayOptIn ?: false,
+                        verifiedDaysCount = state.enrollment?.currentStreak ?: 0,
+                        isSessionRunning = state.isSessionRunning,
+                        isSessionPaused = state.isSessionPaused,
+                        secondsRemaining = state.secondsRemaining,
+                        isVerifiedToday = state.isVerifiedToday,
+                        canDrawOverlays = state.canDrawOverlays,
+                        missions = state.missions,
+                        onToggleMission = { viewModel.toggleMission(it) },
+                        onStartSessionClick = { viewModel.startDailyTestSession() },
+                        onOpenGoogleGroupClick = { viewModel.openGoogleGroupAndMarkJoined() },
+                        onOptInClick = { viewModel.openPlayOptInAndMarkAccepted() },
+                        onRefreshInstallClick = { viewModel.refreshInstallStatus() },
+                        onEnableOverlayClick = { viewModel.requestOverlayPermission() }
+                    )
+                }
+
+                RetentionTracker14Day(
                     verifiedDaysCount = state.enrollment?.currentStreak ?: 0,
-                    isSessionRunning = state.isSessionRunning,
-                    secondsRemaining = state.secondsRemaining,
-                    isVerifiedToday = state.isVerifiedToday,
-                    missions = state.missions,
-                    onToggleMission = { viewModel.toggleMission(it) },
-                    onStartSessionClick = { viewModel.startDailyTestSession() },
-                    onOptInClick = { viewModel.markAcceptedPlayOptIn() }
+                    testerName = "Your 14-Day Streak"
                 )
             } else {
                 Row(modifier = Modifier.fillMaxWidth()) {
