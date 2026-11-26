@@ -224,6 +224,13 @@ class SupabaseAppListingRepository(
 
     init {
         scope.launch { refreshAll() }
+        scope.launch {
+            client.auth.sessionStatus.collect { status ->
+                if (status is SessionStatus.Authenticated || status is SessionStatus.NotAuthenticated) {
+                    refreshAll()
+                }
+            }
+        }
     }
 
     suspend fun refreshAll() {
@@ -357,6 +364,16 @@ class SupabaseEnrollmentRepository(
 
     init {
         scope.launch { refresh() }
+        scope.launch {
+            client.auth.sessionStatus.collect { status ->
+                if (status is SessionStatus.Authenticated) {
+                    refresh()
+                } else if (status is SessionStatus.NotAuthenticated) {
+                    enrollmentsState.value = emptyList()
+                    verificationsState.value = emptyList()
+                }
+            }
+        }
     }
 
     private suspend fun refresh() {
@@ -368,18 +385,26 @@ class SupabaseEnrollmentRepository(
         }
     }
 
-    override fun getEnrollmentsForTester(testerId: String): Flow<List<Enrollment>> =
-        enrollmentsState.map { list -> list.filter { it.testerId == testerId } }
+    override fun getEnrollmentsForTester(testerId: String): Flow<List<Enrollment>> {
+        if (testerId.isNotBlank()) scope.launch { refresh() }
+        return enrollmentsState.map { list -> list.filter { it.testerId.equals(testerId, ignoreCase = true) } }
+    }
 
-    override fun getEnrollmentsForApp(appId: String): Flow<List<Enrollment>> =
-        enrollmentsState.map { list -> list.filter { it.appId == appId } }
+    override fun getEnrollmentsForApp(appId: String): Flow<List<Enrollment>> {
+        if (appId.isNotBlank()) scope.launch { refresh() }
+        return enrollmentsState.map { list -> list.filter { it.appId == appId } }
+    }
 
-    override fun observeEnrollment(appId: String, testerId: String): Flow<Enrollment?> =
-        enrollmentsState.map { list -> list.find { it.appId == appId && it.testerId == testerId } }
+    override fun observeEnrollment(appId: String, testerId: String): Flow<Enrollment?> {
+        if (appId.isNotBlank() && testerId.isNotBlank()) scope.launch { refresh() }
+        return enrollmentsState.map { list ->
+            list.find { it.appId == appId && it.testerId.equals(testerId, ignoreCase = true) }
+        }
+    }
 
     override suspend fun getEnrollment(appId: String, testerId: String): Enrollment? {
         if (enrollmentsState.value.isEmpty()) refresh()
-        return enrollmentsState.value.find { it.appId == appId && it.testerId == testerId }
+        return enrollmentsState.value.find { it.appId == appId && it.testerId.equals(testerId, ignoreCase = true) }
     }
 
     override suspend fun enrollInApp(appId: String, testerId: String): Enrollment {
@@ -464,6 +489,9 @@ class SupabaseEnrollmentRepository(
         targetDays: Int,
         installedVersionCode: Long?
     ): VerificationOutcome {
+        if (enrollmentsState.value.none { it.id == enrollmentId }) {
+            refresh()
+        }
         val enrollment = enrollmentsState.value.find { it.id == enrollmentId }
             ?: error("Enrollment not found")
         val numericAppId = enrollment.appId.toLongOrNull() ?: 1L
@@ -508,6 +536,13 @@ class SupabaseFeedbackRepository(
 
     init {
         scope.launch { refresh() }
+        scope.launch {
+            client.auth.sessionStatus.collect { status ->
+                if (status is SessionStatus.Authenticated || status is SessionStatus.NotAuthenticated) {
+                    refresh()
+                }
+            }
+        }
     }
 
     private suspend fun refresh() {
@@ -578,14 +613,16 @@ class SupabaseFeedbackRepository(
 
     override suspend fun updateFeedbackStatus(feedbackId: String, newStatus: FeedbackStatus): StatusUpdateResult {
         val numericId = feedbackId.toLongOrNull() ?: return StatusUpdateResult(null, null)
-        val res = client.postgrest.rpc(
+        val rawResult = client.postgrest.rpc(
             "triage_feedback_with_bounty",
             buildJsonObject {
                 put("p_feedback_id", numericId)
                 put("p_new_status", newStatus.name)
             }
-        ).decodeAs<JsonObject>()
-        val awarded = res["bounty_awarded"]?.jsonPrimitive?.booleanOrNull ?: false
+        )
+        val awarded = runCatching {
+            rawResult.decodeAs<JsonObject>()["bounty_awarded"]?.jsonPrimitive?.booleanOrNull ?: false
+        }.getOrDefault(false)
         refresh()
         val updated = feedbackState.value.find { it.id == feedbackId }
         return StatusUpdateResult(

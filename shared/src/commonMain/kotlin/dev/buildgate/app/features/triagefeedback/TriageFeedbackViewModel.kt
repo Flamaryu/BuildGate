@@ -85,7 +85,7 @@ class TriageFeedbackViewModel(
         userEnrollmentsFlow
     ) { requestedId, (uid, signedIn), allApps, testerEnrollments ->
         val owned = if (signedIn && uid.isNotBlank()) {
-            allApps.filter { it.ownerId == uid }
+            allApps.filter { it.ownerId.equals(uid, ignoreCase = true) }
         } else {
             emptyList()
         }
@@ -147,7 +147,7 @@ class TriageFeedbackViewModel(
         val canTriage = scope.isSignedIn &&
             scope.userId.isNotBlank() &&
             currentApp != null &&
-            currentApp.ownerId == scope.userId
+            currentApp.ownerId.equals(scope.userId, ignoreCase = true)
         TriageUiState(
             selectedAppId = currentApp?.id ?: _appIdFlow.value,
             selectedApp = currentApp,

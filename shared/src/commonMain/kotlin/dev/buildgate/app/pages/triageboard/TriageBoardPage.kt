@@ -300,11 +300,27 @@ fun TriageBoardPage(
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     items(triageState.items, key = { it.id }) { item ->
-                                        FeedbackItemCard(
-                                            item = item,
-                                            onUpvoteClick = { triageViewModel.upvote(item.id) },
-                                            onCardClick = { triageViewModel.selectItem(item) }
-                                        )
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            FeedbackItemCard(
+                                                item = item,
+                                                onUpvoteClick = { triageViewModel.upvote(item.id) },
+                                                onCardClick = { triageViewModel.selectItem(item) }
+                                            )
+                                            if (triageState.canTriage) {
+                                                val (nextStatus, nextLabel) = when (item.status) {
+                                                    FeedbackStatus.OPEN -> FeedbackStatus.IN_PROGRESS to "Move to Progress ➔"
+                                                    FeedbackStatus.IN_PROGRESS -> FeedbackStatus.FIXED to "Mark Fixed ✅"
+                                                    else -> FeedbackStatus.OPEN to "Reopen ↺"
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { triageViewModel.updateStatus(item.id, nextStatus) },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    shape = RoundedCornerShape(10.dp)
+                                                ) {
+                                                    Text(nextLabel, style = MaterialTheme.typography.labelMedium)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
