@@ -19,17 +19,17 @@ Features live in the Android app, Web Companion, and Supabase backend.
 
 | ID | Feature | Area | Votes / Engagement | Times Suggested | Notes |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| `BG-001` | KMP Android + Web Companion (WasmJS/JS) shared UI | Core | — | — | Single Compose codebase with URL hash routing |
-| `BG-002` | Live Supabase Auth (PKCE + Email/Google) & Postgres RLS | Backend | — | — | Profiles, Karma ledger triggers, `feedback-media` bucket |
-| `BG-003` | 3-Step Guided Closed-Testing Opt-In Wizard | Tester | — | — | Google Group ➔ Play Web Opt-In ➔ `PackageManager` detect |
-| `BG-004` | Daily Testing Queue Playlist & 14-Day Streak + 1-Day Grace | Tester | — | — | Sequential 60s daily check-ins + Karma rewards |
-| `BG-005` | Floating QA Overlay Pill (`QaOverlayService`) | Android QA | — | — | Pause-safe bug logging, 1-tap screenshot, 15s screen clip |
-| `BG-006` | Direct **Verify & Launch Next** + **Close Pill** in Overlay | Android QA | — | — | Advance through daily queue without returning to BuildGate |
-| `BG-007` | Opt-In Foreground Anti-Cheat (`UsageStatsManager`) | Anti-Cheat | — | — | Freezes 60s timer if target app is backgrounded or screen locks |
-| `BG-008` | Real ISO/IEC 18004 Scannable Web ➔ Phone QR Handoff | Web / Mobile | — | — | Pure-Kotlin QR encoder launching `buildgate://app/<pkg>` |
-| `BG-009` | Unified Tier-2 Deep-Link Handshake + 6-Stack Publish Wizard | Developer | — | — | No-Code vs. Deep-Link cards; Kotlin/Java/Flutter/RN/Unity/Godot split snippets + ADB test |
-| `BG-010` | Role-Scoped QA & Triage Hub (Owner vs. Read-Only Known Issues) | Developer / Tester | — | — | Grouped App Picker, sub-tabs, +25⚡ bug bounties, Play Packet export |
-| `BG-011` | Foldable Continuity (Cover ↔ Inner Screen) | Android UX | — | — | `configChanges` + `movableContentOf` + `rememberSaveable` |
+| `BG` | KMP Android + Web Companion (WasmJS/JS) shared UI | Core | — | — | Single Compose codebase with URL hash routing |
+| `BG` | Live Supabase Auth (PKCE + Email/Google) & Postgres RLS | Backend | — | — | Profiles, Karma ledger triggers, `feedback-media` bucket |
+| `BG` | 3-Step Guided Closed-Testing Opt-In Wizard | Tester | — | — | Google Group ➔ Play Web Opt-In ➔ `PackageManager` detect |
+| `BG` | Daily Testing Queue Playlist & 14-Day Streak + 1-Day Grace | Tester | — | — | Sequential 60s daily check-ins + Karma rewards |
+| `BG` | Floating QA Overlay Pill (`QaOverlayService`) | Android QA | — | — | Pause-safe bug logging, 1-tap screenshot, 15s screen clip |
+| `BG` | Direct **Verify & Launch Next** + **Close Pill** in Overlay | Android QA | — | — | Advance through daily queue without returning to BuildGate |
+| `BG` | Opt-In Foreground Anti-Cheat (`UsageStatsManager`) | Anti-Cheat | — | — | Freezes 60s timer if target app is backgrounded or screen locks |
+| `BG` | Real ISO/IEC 18004 Scannable Web ➔ Phone QR Handoff | Web / Mobile | — | — | Pure-Kotlin QR encoder launching `buildgate://app/<pkg>` |
+| `BG` | Unified Tier-2 Deep-Link Handshake + 6-Stack Publish Wizard | Developer | — | — | No-Code vs. Deep-Link cards; Kotlin/Java/Flutter/RN/Unity/Godot split snippets + ADB test |
+| `BG` | Role-Scoped QA & Triage Hub (Owner vs. Read-Only Known Issues) | Developer / Tester | — | — | Grouped App Picker, sub-tabs, +25⚡ bug bounties, Play Packet export |
+| `BG` | Foldable Continuity (Cover ↔ Inner Screen) | Android UX | — | — | `configChanges` + `movableContentOf` + `rememberSaveable` |
 
 ---
 
@@ -38,8 +38,8 @@ Features working in local/closed builds awaiting live testing and polish.
 
 | ID | Feature | Area | Votes / Engagement | Times Suggested | Preview Status |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| `BG-012` | Live Supabase Edge Function (`verify-deeplink-heartbeat`) | Anti-Cheat | 0 | 1 | Deployed to Supabase; needs live end-to-end test in one of the 3 closed-test games |
-| `BG-013` | Google OAuth Sign-In Provider | Auth | 0 | 1 | Code & redirect URLs wired; needs Google Cloud OAuth Client ID/Secret in Supabase Dashboard |
+| `BG-001` | Live Supabase Edge Function (`verify-deeplink-heartbeat`) | Anti-Cheat | 0 | 1 | Deployed to Supabase; needs live end-to-end test in one of the 3 closed-test games |
+| `BG-002` | Google OAuth Sign-In Provider | Auth | 0 | 1 | Code & redirect URLs wired; needs Google Cloud OAuth Client ID/Secret in Supabase Dashboard |
 
 ---
 
@@ -71,13 +71,13 @@ Strong ideas under evaluation — move to **Planned** once scoped or **Rejected*
 
 | ID | Feature | Area | Votes / Engagement | Times Suggested | Why We're Thinking About It |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| `BG-020` | **AI Bug Deduplication & Repro Cleanup** | AI / Triage | 0 | 0 | Auto-clusters duplicate tester reports (*"4 testers hit this on Android 15"*) and formats messy notes into clean repro steps |
-| `BG-021` | **AI-Drafted Play Console Production Access Answers** | AI / Developer | 0 | 0 | Uses your verified 14-day logs, device matrix, and fixed bugs to draft tailored answers to Google Play's Production Access questionnaire |
-| `BG-022` | **Device & OS Coverage Matrix Recruiting** | QA / Matching | 0 | 0 | Let devs request hardware gaps (*"Need 3 Samsung or Android 13 testers"*) with bonus Karma for matching devices |
-| `BG-023` | **Build-Update "Verify Fix" Regression Loop** | QA Pipeline | 0 | 0 | When a dev bumps version (`v1.6.0 ➔ v1.6.1`), auto-assign a quick "Verify Fix" mission for bugs marked Fixed |
-| `BG-024` | **GitHub Issues / Linear / Discord Webhook Sync** | Integrations | 0 | 0 | Push triaged bugs (with screenshot, video clip, device specs) directly to a developer's repo or Discord channel |
-| `BG-025` | **Tester Reliability Tiers & Anti-Churn Score** | Anti-Cheat | 0 | 0 | Surface 14-day completion rate & accepted bug ratio; prioritize reliable testers' apps and throttle Day-2 uninstallers |
-| `BG-026` | **Optional Logcat / Crash Stack-Trace Attachment** | Android QA | 0 | 0 | Lightweight optional helper to attach recent crash logs alongside screenshots and 15s clips |
+| `BG-003` | **AI Bug Deduplication & Repro Cleanup** | AI / Triage | 0 | 0 | Auto-clusters duplicate tester reports (*"4 testers hit this on Android 15"*) and formats messy notes into clean repro steps |
+| `BG-004` | **AI-Drafted Play Console Production Access Answers** | AI / Developer | 0 | 0 | Uses your verified 14-day logs, device matrix, and fixed bugs to draft tailored answers to Google Play's Production Access questionnaire |
+| `BG-005` | **Device & OS Coverage Matrix Recruiting** | QA / Matching | 0 | 0 | Let devs request hardware gaps (*"Need 3 Samsung or Android 13 testers"*) with bonus Karma for matching devices |
+| `BG-006` | **Build-Update "Verify Fix" Regression Loop** | QA Pipeline | 0 | 0 | When a dev bumps version (`v1.6.0 ➔ v1.6.1`), auto-assign a quick "Verify Fix" mission for bugs marked Fixed |
+| `BG-007` | **GitHub Issues / Linear / Discord Webhook Sync** | Integrations | 0 | 0 | Push triaged bugs (with screenshot, video clip, device specs) directly to a developer's repo or Discord channel |
+| `BG-008` | **Tester Reliability Tiers & Anti-Churn Score** | Anti-Cheat | 0 | 0 | Surface 14-day completion rate & accepted bug ratio; prioritize reliable testers' apps and throttle Day-2 uninstallers |
+| `BG-009` | **Optional Logcat / Crash Stack-Trace Attachment** | Android QA | 0 | 0 | Lightweight optional helper to attach recent crash logs alongside screenshots and 15s clips |
 
 ---
 
