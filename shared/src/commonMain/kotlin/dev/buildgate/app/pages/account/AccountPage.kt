@@ -40,11 +40,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import dev.buildgate.app.entities.enrollment.model.EnrollmentStatus
+import dev.buildgate.app.entities.enrollment.repository.EnrollmentRepository
 import dev.buildgate.app.features.auth.AuthUiEvent
 import dev.buildgate.app.features.auth.AuthViewModel
 import dev.buildgate.app.shared.theme.BuildGateThemeMode
 import dev.buildgate.app.shared.theme.BuildGateThemePreferences
 import dev.buildgate.app.widgets.devicetable.DeviceMetadataTable
+import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +62,12 @@ fun AccountPage(
     val passwordInput by viewModel.passwordInput.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
     val themeMode by BuildGateThemePreferences.themeMode.collectAsState()
+    val enrollmentRepo: EnrollmentRepository = koinInject()
+    val activeUserId = session.user?.id ?: if (session.isDemoMode) "tester_1" else ""
+    val enrollmentsFlow = remember(activeUserId) { enrollmentRepo.getEnrollmentsForTester(activeUserId) }
+    val userEnrollments by enrollmentsFlow.collectAsState(initial = emptyList())
+    val activeTestsCount = userEnrollments.count { it.status == EnrollmentStatus.ACTIVE }
+    val totalVerifiedDays = userEnrollments.sumOf { it.verifiedDaysCount }
     var isCreateAccountMode by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -176,13 +185,41 @@ fun AccountPage(
 
                             HorizontalDivider()
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                StatPill("⚡ Karma", "${profile.karmaPoints}", modifier = Modifier.weight(1f))
-                                StatPill("⭐ Trust", "${profile.trustedScore}", modifier = Modifier.weight(1f))
-                                StatPill("🏁 14-Day", "${profile.completedCampaignsCount}", modifier = Modifier.weight(1f))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    StatPill(
+                                        label = "⚡ Karma",
+                                        value = "${profile.karmaPoints}",
+                                        subtitle = "Boosts your apps",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    StatPill(
+                                        label = "⭐ Trust Score",
+                                        value = "${profile.trustedScore}",
+                                        subtitle = "Tester reputation",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    StatPill(
+                                        label = "🧪 Active Tests",
+                                        value = "$activeTestsCount",
+                                        subtitle = if (totalVerifiedDays == 1) "1 verified day" else "$totalVerifiedDays verified days",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    StatPill(
+                                        label = "🏁 14-Day Finishes",
+                                        value = "${profile.completedCampaignsCount}",
+                                        subtitle = "Full 14d completed",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                     }
@@ -354,7 +391,12 @@ fun AccountPage(
 }
 
 @Composable
-private fun StatPill(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatPill(
+    label: String,
+    value: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier
+) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
@@ -362,7 +404,10 @@ private fun StatPill(label: String, value: String, modifier: Modifier = Modifier
             .padding(horizontal = 10.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
@@ -372,8 +417,16 @@ private fun StatPill(label: String, value: String, modifier: Modifier = Modifier
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                )
+            }
         }
     }
 }
