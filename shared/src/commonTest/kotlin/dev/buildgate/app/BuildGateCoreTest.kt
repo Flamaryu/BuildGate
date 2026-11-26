@@ -202,8 +202,12 @@ class BuildGateCoreTest {
 
     @Test
     fun koinAppModule_resolvesAllRepositoriesAndViewModelsInDemoMode() {
+        val demoOverride = org.koin.dsl.module {
+            single { dev.buildgate.app.shared.network.SupabaseConfig(supabaseUrl = "", publishableKey = "") }
+        }
         val app = koinApplication {
-            modules(appModule)
+            allowOverride(true)
+            modules(appModule, demoOverride)
         }
         val koin = app.koin
         assertNotNull(koin.get<AuthRepository>())

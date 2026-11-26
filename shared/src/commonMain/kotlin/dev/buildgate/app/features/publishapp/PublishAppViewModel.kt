@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.buildgate.app.entities.applisting.model.AppListing
 import dev.buildgate.app.entities.applisting.repository.AppListingRepository
 import dev.buildgate.app.entities.testmission.model.TestMission
+import dev.buildgate.app.shared.network.SupabaseConfig
 import dev.buildgate.app.shared.time.BuildGateClock
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +74,9 @@ data class PublishAppUiState(
     fun splitSnippetFor(language: DeepLinkSnippetLanguage): SplitDeepLinkSnippet {
         val scheme = resolvedDeepLinkScheme
         val pkg = packageName.trim().ifBlank { "com.yourcompany.app" }
-        val endpoint = "https://<PROJECT>.supabase.co/functions/v1/verify-deeplink-heartbeat"
+        val baseUrl = SupabaseConfig().takeIf { it.isLiveConfigured }?.supabaseUrl?.trimEnd('/')
+            ?: "https://<PROJECT>.supabase.co"
+        val endpoint = "$baseUrl/functions/v1/verify-deeplink-heartbeat"
         val manifestXml = """
 <intent-filter>
     <action android:name="android.intent.action.VIEW" />
