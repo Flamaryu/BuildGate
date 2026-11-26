@@ -33,6 +33,7 @@ import dev.buildgate.app.entities.auth.model.AuthSession
 import dev.buildgate.app.entities.enrollment.repository.EnrollmentRepository
 import dev.buildgate.app.entities.testerprofile.ui.TesterProfileBadge
 import dev.buildgate.app.shared.time.BuildGateClock
+import dev.buildgate.app.shared.ui.BuildGateLogo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,17 +59,23 @@ fun DiscoveryPage(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "BuildGate Hub",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Karma-Ranked Android Closed Testing & QA Pipeline",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        BuildGateLogo(size = 32.dp)
+                        Column {
+                            Text(
+                                text = "BuildGate Hub",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Karma-Ranked Android Closed Testing & QA Pipeline",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 actions = {

@@ -68,6 +68,7 @@ import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
 import dev.buildgate.app.app.di.koinScopedViewModel
 import dev.buildgate.app.shared.theme.BuildGateTheme
+import dev.buildgate.app.shared.ui.BuildGateLogo
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 
@@ -445,13 +446,14 @@ private fun DesktopBrandSidebar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    BuildGateLogo(size = 34.dp)
                     Column {
                         Text(
-                            text = "🛡️ BuildGate",
+                            text = "BuildGate",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
