@@ -18,6 +18,8 @@ interface AppListingRepository {
     suspend fun updateListing(listing: AppListing): AppListing
     fun getMissionsForApp(appId: String): Flow<List<TestMission>>
     suspend fun createMission(mission: TestMission)
+    suspend fun updateMission(mission: TestMission)
+    suspend fun deleteMission(missionId: String)
     suspend fun toggleMissionCompletion(missionId: String)
 }
 
@@ -194,6 +196,25 @@ class DemoAppListingRepository : AppListingRepository {
 
     override suspend fun createMission(mission: TestMission) {
         sampleMissions.update { it + mission }
+    }
+
+    override suspend fun updateMission(mission: TestMission) {
+        sampleMissions.update { list ->
+            list.map { existing ->
+                if (existing.id == mission.id) {
+                    existing.copy(
+                        title = mission.title,
+                        instructions = mission.instructions,
+                        buildVersion = mission.buildVersion,
+                        isRequired = mission.isRequired
+                    )
+                } else existing
+            }
+        }
+    }
+
+    override suspend fun deleteMission(missionId: String) {
+        sampleMissions.update { list -> list.filterNot { it.id == missionId } }
     }
 
     override suspend fun toggleMissionCompletion(missionId: String) {

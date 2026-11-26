@@ -324,6 +324,27 @@ class SupabaseAppListingRepository(
         refreshAll()
     }
 
+    override suspend fun updateMission(mission: TestMission) {
+        val numericId = mission.id.toLongOrNull() ?: return
+        client.from("test_missions").update({
+            set("title", mission.title)
+            set("instructions", mission.instructions)
+            set("build_version", mission.buildVersion)
+            set("is_required", mission.isRequired)
+        }) {
+            filter { eq("id", numericId) }
+        }
+        refreshAll()
+    }
+
+    override suspend fun deleteMission(missionId: String) {
+        val numericId = missionId.toLongOrNull() ?: return
+        client.from("test_missions").delete {
+            filter { eq("id", numericId) }
+        }
+        refreshAll()
+    }
+
     override suspend fun toggleMissionCompletion(missionId: String) {
         var newCompleted = false
         missionsState.value = missionsState.value.map {
