@@ -1,0 +1,64 @@
+name: 💡 Feature Request / Suggestion
+description: Suggest a new feature or improvement for BuildGate (Android app, Web Companion, QA Overlay, or AI Missions)
+title: "[Feature]: "
+labels: ["enhancement", "status: suggested"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping shape **BuildGate**!
+        Before submitting, please check our `ROADMAP.md` and existing issues — if your idea is already listed, give it a **👍 reaction** and add a comment with your use case instead of opening a duplicate.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature Area
+      description: Which part of BuildGate does this improve?
+      options:
+        - Android App (Tester Flow / Daily Queue)
+        - Floating QA Overlay (Screenshots, Clips, Bug Sheet)
+        - Web Companion (Command Center / QR Handoff)
+        - Developer Tools (Publish Wizard, Triage, Play Packet)
+        - AI QA Missions & Smart Assignment
+        - Verification & Anti-Cheat (UsageStats / Deep Links)
+        - Backend / Supabase / Integrations
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: persona
+    attributes:
+      label: Who benefits most?
+      options:
+        - Indie Android Developer (App Owner)
+        - Closed Tester
+        - Both Developers & Testers
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the pain point in Google Play closed testing or BuildGate today.
+      placeholder: "e.g., All 16 of my testers only click the login screen, so my deeper game levels never get tested..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this to work?
+      placeholder: "Describe the ideal flow, UI, or integration..."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Quick Check
+      options:
+        - label: I checked existing issues and ROADMAP.md to avoid duplicates
+          required: true

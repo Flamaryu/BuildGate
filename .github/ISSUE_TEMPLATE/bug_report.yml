@@ -1,0 +1,49 @@
+name: 🐛 Bug Report
+description: Report a crash, UI glitch, or broken flow in BuildGate itself
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android App
+        - Web Companion (WasmJS / JS)
+        - Floating QA Overlay
+        - Supabase / Edge Function
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device & OS / Browser
+      placeholder: "e.g., Samsung Galaxy Z Fold (Android 17) or Chrome 132 on macOS"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Open BuildGate and go to...
+        2. Tap...
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. Actual Behavior
+      placeholder: "What did you expect to happen, and what happened instead?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots, Screen Clip, or Logs (Optional)
+      description: Paste any logcat / browser console errors or drag-and-drop screenshots here.
