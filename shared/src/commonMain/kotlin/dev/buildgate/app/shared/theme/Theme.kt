@@ -22,15 +22,23 @@ enum class BuildGateThemeMode(val label: String, val icon: String) {
 }
 
 object BuildGateThemePreferences {
-    private val _themeMode = MutableStateFlow(BuildGateThemeMode.SYSTEM)
+    private val _themeMode = MutableStateFlow(parseMode(loadPersistedThemeModeName()))
     val themeMode: StateFlow<BuildGateThemeMode> = _themeMode.asStateFlow()
+
+    private fun parseMode(raw: String?): BuildGateThemeMode =
+        BuildGateThemeMode.entries.find { it.name == raw } ?: BuildGateThemeMode.SYSTEM
+
+    fun reloadFromStorage() {
+        _themeMode.value = parseMode(loadPersistedThemeModeName())
+    }
 
     fun setThemeMode(mode: BuildGateThemeMode) {
         _themeMode.value = mode
+        savePersistedThemeModeName(mode.name)
     }
 
     fun cycleThemeMode() {
-        _themeMode.value = _themeMode.value.next()
+        setThemeMode(_themeMode.value.next())
     }
 }
 

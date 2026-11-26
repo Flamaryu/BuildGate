@@ -213,9 +213,12 @@ class AndroidPlatformVerifier(
 
 private var appContextProvider: (() -> Context?) = { null }
 
+internal fun getAndroidAppContext(): Context? = appContextProvider()
+
 fun initAndroidPlatformVerifier(context: Context) {
     val appCtx = context.applicationContext
     appContextProvider = { appCtx }
+    dev.buildgate.app.shared.theme.BuildGateThemePreferences.reloadFromStorage()
 }
 
 actual fun getPlatformVerifier(): PlatformVerifier = AndroidPlatformVerifier(appContextProvider)
