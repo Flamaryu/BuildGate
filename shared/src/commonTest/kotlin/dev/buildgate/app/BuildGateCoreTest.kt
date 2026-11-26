@@ -326,6 +326,34 @@ class BuildGateCoreTest {
         val decoded = lenientJson.decodeFromString(AppListing.serializer(), postgrestPayload)
         assertEquals("42", decoded.id)
         assertEquals("com.mkdinteractive.shatterhorde", decoded.packageName)
+
+        val feedbackPayload = """
+            {
+              "id": 1,
+              "app_id": 1,
+              "author_id": "8f611d9d-b3c7-4fda-9385-259dfa220b68",
+              "session_id": null,
+              "build_version": "v1.3.0",
+              "category": "BUG",
+              "status": "OPEN",
+              "title": "movement issue",
+              "description": "its hard to tell what axis I'm moving against",
+              "device_metadata": {"model": "samsung SM-F971U", "osVersion": "Android 17 (API 37)", "aspectRatio": "312:493", "platformName": "Android Mobile", "screenResolution": "1248x1972"},
+              "screenshot_path": "https://lrqwkdqheumyigrpqevw.supabase.co/storage/v1/object/public/feedback-media/u/1/shot.webp",
+              "video_clip_path": null,
+              "media_duration_ms": null,
+              "upvotes": 1,
+              "bounty_awarded": false,
+              "created_at": "2026-11-26 06:13:44.037952+00"
+            }
+        """.trimIndent()
+        val decodedFb = lenientJson.decodeFromString(
+            dev.buildgate.app.entities.feedbackitem.model.FeedbackItem.serializer(),
+            feedbackPayload
+        )
+        assertEquals("1", decodedFb.id)
+        assertEquals("1", decodedFb.appId)
+        assertTrue(decodedFb.screenshotUrl?.endsWith("shot.webp") == true)
     }
 
     private fun sampleApp(id: String, pkg: String) = AppListing(

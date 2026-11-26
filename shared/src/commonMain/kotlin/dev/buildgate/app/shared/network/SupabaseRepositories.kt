@@ -461,8 +461,10 @@ class SupabaseFeedbackRepository(
         }
     }
 
-    override fun getFeedbackForApp(appId: String): Flow<List<FeedbackItem>> =
-        feedbackState.map { list -> list.filter { it.appId == appId } }
+    override fun getFeedbackForApp(appId: String): Flow<List<FeedbackItem>> {
+        scope.launch { refresh() }
+        return feedbackState.map { list -> list.filter { it.appId == appId } }
+    }
 
     override suspend fun submitFeedback(
         appId: String,

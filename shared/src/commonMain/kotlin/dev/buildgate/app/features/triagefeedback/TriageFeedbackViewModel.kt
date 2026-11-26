@@ -55,30 +55,36 @@ class TriageFeedbackViewModel(
     val eventFlow = _eventChannel.receiveAsFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val appScopedData = _appIdFlow.flatMapLatest { appId ->
+    private val resolvedAppFlow = combine(_appIdFlow, appListingRepository.getListings()) { requestedId, apps ->
+        val currentApp = apps.find { it.id == requestedId || it.packageName == requestedId }
+            ?: apps.firstOrNull()
+        Pair(currentApp, apps)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val appScopedData = resolvedAppFlow.flatMapLatest { (currentApp, apps) ->
+        val effectiveId = currentApp?.id ?: _appIdFlow.value
         combine(
-            appListingRepository.getListings(),
-            feedbackRepository.getFeedbackForApp(appId),
-            enrollmentRepository.getEnrollmentsForApp(appId)
-        ) { apps, feedback, enrollments ->
-            Triple(apps, feedback, enrollments)
+            feedbackRepository.getFeedbackForApp(effectiveId),
+            enrollmentRepository.getEnrollmentsForApp(effectiveId)
+        ) { feedback, enrollments ->
+            Triple(Pair(currentApp, apps), feedback, enrollments)
         }
     }
 
     val uiState: StateFlow<TriageUiState> = combine(
-        _appIdFlow,
         appScopedData,
         _buildFilter,
         _categoryFilter,
         _selectedItem
-    ) { appId, (apps, items, enrollments), build, category, selected ->
-        val currentApp = apps.find { it.id == appId || it.packageName == appId } ?: apps.firstOrNull()
+    ) { (appPair, items, enrollments), build, category, selected ->
+        val (currentApp, apps) = appPair
         val filtered = items.filter { item ->
             (build == null || item.buildVersion == build) &&
             (category == null || item.category == category)
         }
         TriageUiState(
-            selectedAppId = currentApp?.id ?: appId,
+            selectedAppId = currentApp?.id ?: _appIdFlow.value,
             selectedApp = currentApp,
             availableApps = apps,
             enrollmentsForApp = enrollments,

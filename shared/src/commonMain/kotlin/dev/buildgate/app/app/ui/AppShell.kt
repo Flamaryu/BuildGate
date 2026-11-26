@@ -74,6 +74,7 @@ fun AppShell() {
             val feedbackRepo: FeedbackRepository = koinInject()
 
             val authSession by authViewModel.sessionState.collectAsState()
+            val allListings by appListingRepo.getListings().collectAsState(initial = emptyList())
             val currentUserId = authSession.user?.id ?: "tester_1"
             val currentUsername = authSession.profile?.username ?: "Tester"
 
@@ -196,7 +197,12 @@ fun AppShell() {
                 when (tab) {
                     TopLevelTab.DISCOVERY -> navigateTo(BuildGateRoute.Discovery)
                     TopLevelTab.DAILY_QUEUE -> navigateTo(BuildGateRoute.DailyQueue)
-                    TopLevelTab.TRIAGE_BOARD -> navigateTo(BuildGateRoute.TriageBoard("app_1"))
+                    TopLevelTab.TRIAGE_BOARD -> {
+                        val defaultAppId = allListings.firstOrNull { it.ownerId == currentUserId }?.id
+                            ?: allListings.firstOrNull()?.id
+                            ?: "1"
+                        navigateTo(BuildGateRoute.TriageBoard(defaultAppId))
+                    }
                     TopLevelTab.PUBLISH_APP -> navigateTo(BuildGateRoute.PublishApp)
                     TopLevelTab.ACCOUNT -> navigateTo(BuildGateRoute.Account)
                 }
