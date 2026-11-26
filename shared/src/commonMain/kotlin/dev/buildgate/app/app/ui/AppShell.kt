@@ -295,9 +295,13 @@ fun AppShell() {
                             PublishAppPage(
                                 ownerId = currentUserId,
                                 ownerKarma = authSession.profile?.karmaPoints ?: 50,
+                                isSignedIn = authSession.isLoggedIn,
                                 viewModel = publishAppViewModel,
                                 onPublished = { publishedPkg ->
                                     navigateTo(BuildGateRoute.AppCampaign(publishedPkg))
+                                },
+                                onNavigateToAccount = {
+                                    navigateTo(BuildGateRoute.Account)
                                 }
                             )
                         }

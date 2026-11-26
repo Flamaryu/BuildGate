@@ -57,8 +57,10 @@ import org.koin.compose.koinInject
 fun PublishAppPage(
     ownerId: String,
     ownerKarma: Int,
+    isSignedIn: Boolean = true,
     viewModel: PublishAppViewModel,
     onPublished: (String) -> Unit,
+    onNavigateToAccount: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -86,7 +88,11 @@ fun PublishAppPage(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Your Karma ($ownerKarma ⚡) boosts your app's Discovery rank automatically",
+                            text = if (isSignedIn) {
+                                "Your Karma ($ownerKarma ⚡) boosts your app's Discovery rank automatically"
+                            } else {
+                                "Sign in or create a free account to publish your closed-testing app"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -97,6 +103,46 @@ fun PublishAppPage(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { innerPadding ->
+        if (!isSignedIn || ownerId.isBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Sign In to Publish Your App",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Create a free BuildGate account (you'll get +50⚡ Starter Karma) or sign in so we can link your 14-day closed-testing campaign, QA triage board, and Google Play Production Access packet to your developer profile.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onNavigateToAccount,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text("Sign In / Create Account (+50⚡)")
+                        }
+                    }
+                }
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

@@ -254,6 +254,12 @@ class PublishAppViewModel(
     fun onInitialMissionInstructionsChanged(v: String) { _uiState.update { it.copy(initialMissionInstructions = v) } }
 
     fun publishCampaign(ownerId: String, ownerKarma: Int) {
+        if (ownerId.isBlank()) {
+            viewModelScope.launch {
+                _eventChannel.send(PublishAppEvent.ShowMessage("Please sign in or create an account before publishing an app."))
+            }
+            return
+        }
         val s = _uiState.value
         val pkg = s.packageName.trim()
         if (s.title.isBlank() || !packageRegex.matches(pkg)) {
