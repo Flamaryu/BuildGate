@@ -52,4 +52,15 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().all()) { variantBuilder ->
+        (variantBuilder as? com.android.build.api.variant.HasUnitTestBuilder)?.enableUnitTest = true
+    }
 }
