@@ -30,6 +30,7 @@ import dev.buildgate.app.entities.feedbackitem.ui.FeedbackItemCard
 @Composable
 fun TriageKanbanBoard(
     items: List<FeedbackItem>,
+    canTriage: Boolean,
     onStatusChange: (String, FeedbackStatus) -> Unit,
     onUpvote: (String) -> Unit,
     onItemSelect: (FeedbackItem) -> Unit,
@@ -46,6 +47,7 @@ fun TriageKanbanBoard(
         KanbanColumn(
             title = "🔴 OPEN (${openItems.size})",
             items = openItems,
+            canTriage = canTriage,
             targetStatus = FeedbackStatus.IN_PROGRESS,
             actionLabel = "Move to Progress ➔",
             onStatusChange = onStatusChange,
@@ -57,6 +59,7 @@ fun TriageKanbanBoard(
         KanbanColumn(
             title = "🟡 IN PROGRESS (${inProgressItems.size})",
             items = inProgressItems,
+            canTriage = canTriage,
             targetStatus = FeedbackStatus.FIXED,
             actionLabel = "Mark Fixed ✅",
             onStatusChange = onStatusChange,
@@ -68,6 +71,7 @@ fun TriageKanbanBoard(
         KanbanColumn(
             title = "🟢 FIXED / VERIFIED (${fixedItems.size})",
             items = fixedItems,
+            canTriage = canTriage,
             targetStatus = FeedbackStatus.OPEN,
             actionLabel = "Reopen ↺",
             onStatusChange = onStatusChange,
@@ -82,6 +86,7 @@ fun TriageKanbanBoard(
 private fun KanbanColumn(
     title: String,
     items: List<FeedbackItem>,
+    canTriage: Boolean,
     targetStatus: FeedbackStatus,
     actionLabel: String,
     onStatusChange: (String, FeedbackStatus) -> Unit,
@@ -126,16 +131,18 @@ private fun KanbanColumn(
                         onCardClick = { onItemSelect(item) }
                     )
 
-                    Button(
-                        onClick = { onStatusChange(item.id, targetStatus) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    ) {
-                        Text(actionLabel, style = MaterialTheme.typography.labelSmall)
+                    if (canTriage) {
+                        Button(
+                            onClick = { onStatusChange(item.id, targetStatus) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Text(actionLabel, style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }

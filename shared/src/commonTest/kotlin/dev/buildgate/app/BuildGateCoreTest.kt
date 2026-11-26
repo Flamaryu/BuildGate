@@ -356,6 +356,44 @@ class BuildGateCoreTest {
         assertTrue(decodedFb.screenshotUrl?.endsWith("shot.webp") == true)
     }
 
+    @Test
+    fun triageViewModel_enforcesOwnerOnlyTriage_andScopesOwnedAndEnrolledApps() = runTest {
+        val listingRepo = dev.buildgate.app.entities.applisting.repository.DemoAppListingRepository()
+        val enrollmentRepo = dev.buildgate.app.entities.enrollment.repository.DemoEnrollmentRepository()
+        val feedbackRepo = DemoFeedbackRepository()
+        val authRepo = dev.buildgate.app.entities.auth.repository.DemoAuthRepository()
+
+        val vm = TriageFeedbackViewModel(
+            feedbackRepository = feedbackRepo,
+            appListingRepository = listingRepo,
+            enrollmentRepository = enrollmentRepo,
+            authRepository = authRepo
+        )
+
+        // 1. Signed out on top-level tab (empty appId) -> no app selected, canTriage is false
+        vm.setUserContext(userId = "", isSignedIn = false)
+        vm.selectApp("")
+        val signedOutState = vm.uiState.first { !it.isSignedIn }
+        assertFalse(signedOutState.canTriage)
+        assertNull(signedOutState.selectedApp)
+
+        // 2. Signed out viewing a specific app from Discover -> read-only (canTriage = false)
+        vm.selectApp("app_1")
+        val guestReadOnly = vm.uiState.first { it.selectedApp?.id == "app_1" }
+        assertFalse(guestReadOnly.canTriage)
+
+        // 3. Signed in as non-owner tester ("tester_99") -> still read-only (canTriage = false)
+        vm.setUserContext(userId = "tester_99", isSignedIn = true)
+        val nonOwnerState = vm.uiState.first { it.currentUserId == "tester_99" }
+        assertFalse(nonOwnerState.canTriage)
+
+        // 4. Signed in as owner ("tester_1") -> canTriage = true and ownedApps populated
+        vm.setUserContext(userId = "tester_1", isSignedIn = true)
+        val ownerState = vm.uiState.first { it.currentUserId == "tester_1" && it.canTriage }
+        assertTrue(ownerState.canTriage)
+        assertTrue(ownerState.ownedApps.any { it.id == "app_1" })
+    }
+
     private fun sampleApp(id: String, pkg: String) = AppListing(
         id = id,
         ownerId = "owner_1",

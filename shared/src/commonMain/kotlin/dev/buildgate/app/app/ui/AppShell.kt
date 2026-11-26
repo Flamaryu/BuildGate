@@ -201,10 +201,13 @@ fun AppShell() {
                     TopLevelTab.DISCOVERY -> navigateTo(BuildGateRoute.Discovery)
                     TopLevelTab.DAILY_QUEUE -> navigateTo(BuildGateRoute.DailyQueue)
                     TopLevelTab.TRIAGE_BOARD -> {
-                        val defaultAppId = allListings.firstOrNull { it.ownerId == currentUserId }?.id
-                            ?: allListings.firstOrNull()?.id
-                            ?: "1"
-                        navigateTo(BuildGateRoute.TriageBoard(defaultAppId))
+                        if (!authSession.isLoggedIn) {
+                            navigateTo(BuildGateRoute.TriageBoard(""))
+                        } else {
+                            val defaultAppId = allListings.firstOrNull { it.ownerId == currentUserId }?.id
+                                ?: ""
+                            navigateTo(BuildGateRoute.TriageBoard(defaultAppId))
+                        }
                     }
                     TopLevelTab.PUBLISH_APP -> navigateTo(BuildGateRoute.PublishApp)
                     TopLevelTab.ACCOUNT -> navigateTo(BuildGateRoute.Account)
@@ -260,8 +263,15 @@ fun AppShell() {
                                 missionsViewModel = missionsViewModel,
                                 testerId = currentUserId,
                                 testerUsername = currentUsername,
+                                isSignedIn = authSession.isLoggedIn,
                                 onOpenProductionPacket = { targetAppId ->
                                     navigateTo(BuildGateRoute.ProductionPacket(targetAppId))
+                                },
+                                onNavigateToAccount = {
+                                    navigateTo(BuildGateRoute.Account)
+                                },
+                                onNavigateToDiscovery = {
+                                    navigateTo(BuildGateRoute.Discovery)
                                 }
                             )
                         }
