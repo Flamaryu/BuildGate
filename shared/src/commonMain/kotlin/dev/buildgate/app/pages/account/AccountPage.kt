@@ -42,6 +42,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.buildgate.app.features.auth.AuthUiEvent
 import dev.buildgate.app.features.auth.AuthViewModel
+import dev.buildgate.app.shared.theme.BuildGateThemeMode
+import dev.buildgate.app.shared.theme.BuildGateThemePreferences
 import dev.buildgate.app.widgets.devicetable.DeviceMetadataTable
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +58,7 @@ fun AccountPage(
     val usernameInput by viewModel.usernameInput.collectAsState()
     val passwordInput by viewModel.passwordInput.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
+    val themeMode by BuildGateThemePreferences.themeMode.collectAsState()
     var isCreateAccountMode by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -100,6 +103,39 @@ fun AccountPage(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Appearance",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            BuildGateThemeMode.entries.forEach { mode ->
+                                FilterChip(
+                                    selected = themeMode == mode,
+                                    onClick = { BuildGateThemePreferences.setThemeMode(mode) },
+                                    label = { Text("${mode.icon} ${mode.label}") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             if (session.isLoggedIn && session.profile != null) {
                 val profile = session.profile!!
                 item {

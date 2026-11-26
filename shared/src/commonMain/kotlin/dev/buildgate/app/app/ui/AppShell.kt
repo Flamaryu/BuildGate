@@ -68,14 +68,17 @@ import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
 import dev.buildgate.app.app.di.koinScopedViewModel
 import dev.buildgate.app.shared.theme.BuildGateTheme
+import dev.buildgate.app.shared.theme.BuildGateThemeMode
+import dev.buildgate.app.shared.theme.BuildGateThemePreferences
 import dev.buildgate.app.shared.ui.BuildGateLogo
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 
 @Composable
 fun AppShell() {
+    val themeMode by BuildGateThemePreferences.themeMode.collectAsState()
     KoinApplication(application = { modules(appModule) }) {
-        BuildGateTheme {
+        BuildGateTheme(themeMode = themeMode) {
             val navController = rememberNavController()
             var activeTabName by rememberSaveable { mutableStateOf(TopLevelTab.DISCOVERY.name) }
             val activeTab = TopLevelTab.entries.find { it.name == activeTabName } ?: TopLevelTab.DISCOVERY
@@ -388,6 +391,8 @@ fun AppShell() {
                             isDemoMode = authSession.isDemoMode,
                             username = currentUsername,
                             karmaPoints = authSession.profile?.karmaPoints ?: 0,
+                            themeMode = themeMode,
+                            onCycleTheme = { BuildGateThemePreferences.cycleThemeMode() },
                             onTabSelected = { onTabSelected(it) }
                         )
                         VerticalDivider(
@@ -428,6 +433,8 @@ private fun DesktopBrandSidebar(
     isDemoMode: Boolean,
     username: String,
     karmaPoints: Int,
+    themeMode: BuildGateThemeMode,
+    onCycleTheme: () -> Unit,
     onTabSelected: (TopLevelTab) -> Unit
 ) {
     Surface(
@@ -503,6 +510,29 @@ private fun DesktopBrandSidebar(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .clickable(onClick = onCycleTheme)
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${themeMode.icon} Theme",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = themeMode.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -754,130 +754,206 @@ private fun DeveloperOverviewTab(
     val fixedIssues = items.filter { it.status == FeedbackStatus.FIXED }
     val requiredMissions = missions.count { it.isRequired }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
     ) {
-        // KPI Stat Cards
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            KpiStatCard(
-                label = "Active Testers",
-                value = "$enrolledCount / ${app.targetTesters}",
-                subtitle = "Google Play min: 12",
-                modifier = Modifier.weight(1f)
-            )
-            KpiStatCard(
-                label = "Open Bugs",
-                value = "${openIssues.size}",
-                subtitle = "${fixedIssues.size} fixed · ${items.size} total",
-                modifier = Modifier.weight(1f)
-            )
-            KpiStatCard(
-                label = "QA Missions",
-                value = "${missions.size}",
-                subtitle = "$requiredMissions required for ${app.currentBuildVersion}",
-                modifier = Modifier.weight(1f)
-            )
-            KpiStatCard(
-                label = "Best 14-Day Streak",
-                value = "$bestStreak / ${app.targetDays}d",
-                subtitle = "Verified daily check-ins",
-                modifier = Modifier.weight(1f)
-            )
-        }
+        val isCompactOverview = maxWidth < 640.dp
 
-        // 14-Day Retention Pulse
-        RetentionTracker14Day(
-            verifiedDaysCount = bestStreak,
-            testerName = "$enrolledCount Enrolled Testers · ${app.title}"
-        )
-
-        // Quick Actions Bar
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(onClick = onAddMissionClick, shape = RoundedCornerShape(12.dp)) {
-                    Text("🎯 Manage QA Missions")
+            // KPI Stat Cards (2x2 grid on mobile, 4-across row on desktop)
+            if (isCompactOverview) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        KpiStatCard(
+                            label = "Active Testers",
+                            value = "$enrolledCount / ${app.targetTesters}",
+                            subtitle = "Google Play min: 12",
+                            modifier = Modifier.weight(1f)
+                        )
+                        KpiStatCard(
+                            label = "Open Bugs",
+                            value = "${openIssues.size}",
+                            subtitle = "${fixedIssues.size} fixed · ${items.size} total",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        KpiStatCard(
+                            label = "QA Missions",
+                            value = "${missions.size}",
+                            subtitle = "$requiredMissions req · ${app.currentBuildVersion}",
+                            modifier = Modifier.weight(1f)
+                        )
+                        KpiStatCard(
+                            label = "Best Streak",
+                            value = "$bestStreak / ${app.targetDays}d",
+                            subtitle = "Verified daily check-ins",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
-                OutlinedButton(onClick = onEditCampaignClick, shape = RoundedCornerShape(12.dp)) {
-                    Text("✏️ Bump Build / Edit Details")
-                }
-                OutlinedButton(onClick = onOpenPacketClick, shape = RoundedCornerShape(12.dp)) {
-                    Text("📦 Export Play Packet")
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    KpiStatCard(
+                        label = "Active Testers",
+                        value = "$enrolledCount / ${app.targetTesters}",
+                        subtitle = "Google Play min: 12",
+                        modifier = Modifier.weight(1f)
+                    )
+                    KpiStatCard(
+                        label = "Open Bugs",
+                        value = "${openIssues.size}",
+                        subtitle = "${fixedIssues.size} fixed · ${items.size} total",
+                        modifier = Modifier.weight(1f)
+                    )
+                    KpiStatCard(
+                        label = "QA Missions",
+                        value = "${missions.size}",
+                        subtitle = "$requiredMissions required for ${app.currentBuildVersion}",
+                        modifier = Modifier.weight(1f)
+                    )
+                    KpiStatCard(
+                        label = "Best 14-Day Streak",
+                        value = "$bestStreak / ${app.targetDays}d",
+                        subtitle = "Verified daily check-ins",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
-        }
 
-        // Recent Open Issues Preview
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+            // 14-Day Retention Pulse
+            RetentionTracker14Day(
+                verifiedDaysCount = bestStreak,
+                testerName = "$enrolledCount Enrolled Testers · ${app.title}"
+            )
+
+            // Quick Actions Bar (stacked on mobile, horizontal row on desktop)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Text(
-                    text = "Recent Open Reports (${openIssues.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                if (openIssues.isEmpty()) {
-                    Text(
-                        text = "No open bugs right now — your testers' bug reports will appear here for triage.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    openIssues.take(5).forEach { bug ->
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { onInspectIssue(bug) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                if (isCompactOverview) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onAddMissionClick,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Row(
+                            Text("🎯 Manage QA Missions")
+                        }
+                        OutlinedButton(
+                            onClick = onEditCampaignClick,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("✏️ Bump Build / Edit Details")
+                        }
+                        OutlinedButton(
+                            onClick = onOpenPacketClick,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("📦 Export Play Packet")
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(onClick = onAddMissionClick, shape = RoundedCornerShape(12.dp)) {
+                            Text("🎯 Manage QA Missions")
+                        }
+                        OutlinedButton(onClick = onEditCampaignClick, shape = RoundedCornerShape(12.dp)) {
+                            Text("✏️ Bump Build / Edit Details")
+                        }
+                        OutlinedButton(onClick = onOpenPacketClick, shape = RoundedCornerShape(12.dp)) {
+                            Text("📦 Export Play Packet")
+                        }
+                    }
+                }
+            }
+
+            // Recent Open Issues Preview
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Recent Open Reports (${openIssues.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (openIssues.isEmpty()) {
+                        Text(
+                            text = "No open bugs right now — your testers' bug reports will appear here for triage.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        openIssues.take(5).forEach { bug ->
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onInspectIssue(bug) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = bug.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${bug.category.name} · ${bug.buildVersion} · ${bug.deviceMetadata.model}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                     Text(
-                                        text = bug.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "${bug.category.name} · ${bug.buildVersion} · ${bug.deviceMetadata.model}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = "Inspect ➔",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                                Text(
-                                    text = "Inspect ➔",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
                             }
                         }
                     }

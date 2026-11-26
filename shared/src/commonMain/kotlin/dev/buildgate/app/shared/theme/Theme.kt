@@ -5,6 +5,34 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+enum class BuildGateThemeMode(val label: String, val icon: String) {
+    SYSTEM("System", "📱"),
+    LIGHT("Light", "☀️"),
+    DARK("Dark", "🌙");
+
+    fun next(): BuildGateThemeMode = when (this) {
+        SYSTEM -> LIGHT
+        LIGHT -> DARK
+        DARK -> SYSTEM
+    }
+}
+
+object BuildGateThemePreferences {
+    private val _themeMode = MutableStateFlow(BuildGateThemeMode.SYSTEM)
+    val themeMode: StateFlow<BuildGateThemeMode> = _themeMode.asStateFlow()
+
+    fun setThemeMode(mode: BuildGateThemeMode) {
+        _themeMode.value = mode
+    }
+
+    fun cycleThemeMode() {
+        _themeMode.value = _themeMode.value.next()
+    }
+}
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryViolet,
@@ -50,10 +78,15 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun BuildGateTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: BuildGateThemeMode = BuildGateThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val useDarkTheme = when (themeMode) {
+        BuildGateThemeMode.SYSTEM -> isSystemInDarkTheme()
+        BuildGateThemeMode.LIGHT -> false
+        BuildGateThemeMode.DARK -> true
+    }
+    val colorScheme = if (useDarkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
