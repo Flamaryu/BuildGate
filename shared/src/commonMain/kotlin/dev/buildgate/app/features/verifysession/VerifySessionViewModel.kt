@@ -103,9 +103,13 @@ class VerifySessionViewModel(
                 return@launch
             }
             val pkgInfo = platformVerifier.inspectInstalledApp(resolved.packageName)
-            enrollmentRepository.enrollInApp(resolved.id, testerId)
-            if (platformVerifier.supportsDeviceVerification) {
-                enrollmentRepository.syncInstallStatus(resolved.id, testerId, pkgInfo.isInstalled, pkgInfo.versionCode)
+            if (testerId.isNotBlank()) {
+                runCatching { enrollmentRepository.enrollInApp(resolved.id, testerId) }
+                if (platformVerifier.supportsDeviceVerification) {
+                    runCatching {
+                        enrollmentRepository.syncInstallStatus(resolved.id, testerId, pkgInfo.isInstalled, pkgInfo.versionCode)
+                    }
+                }
             }
 
             combine(
@@ -224,12 +228,24 @@ class VerifySessionViewModel(
         val enrollment = _uiState.value.enrollment
 
         viewModelScope.launch {
+            val session = authRepository.getAuthSession().first()
+            if (!session.isLoggedIn) {
+                _eventChannel.send(
+                    SessionUiEvent.ShowMessage("Please sign in on the Account tab first to start a verified 60s session.")
+                )
+                return@launch
+            }
+            val effectiveTesterId = session.user?.id ?: activeTesterId
+            if (effectiveTesterId.isNotBlank()) {
+                runCatching { enrollmentRepository.enrollInApp(currentApp.id, effectiveTesterId) }
+            }
+
             // Ensure the QA overlay always knows the full remaining daily queue — even when launched
             // from Discovery or after closing the pill via stopSession().
             val existingQueue = sessionCoordinator.state.value.queueApps
             if (existingQueue.isEmpty() || existingQueue.none { it.id == currentApp.id }) {
                 val allListings = appListingRepository.getListings().first()
-                val testerEnrollments = enrollmentRepository.getEnrollmentsForTester(activeTesterId).first()
+                val testerEnrollments = enrollmentRepository.getEnrollmentsForTester(effectiveTesterId).first()
                 val todayUtc = BuildGateClock.todayUtcDate()
                 val remainingEnrolled = testerEnrollments
                     .filter {
@@ -239,13 +255,13 @@ class VerifySessionViewModel(
                     }
                     .mapNotNull { enr -> allListings.find { it.id == enr.appId } }
                 val orderedQueue = listOf(currentApp) + remainingEnrolled
-                sessionCoordinator.startQueue(orderedQueue, activeTesterId)
+                sessionCoordinator.startQueue(orderedQueue, effectiveTesterId)
             }
 
             sessionCoordinator.startAppSession(
                 app = currentApp,
                 enrollmentId = enrollment?.id,
-                testerId = activeTesterId,
+                testerId = effectiveTesterId,
                 sessionToken = sessionToken,
                 targetDurationMs = 60_000L
             )

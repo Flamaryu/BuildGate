@@ -39,13 +39,13 @@ class AuthViewModel(
     private val _eventChannel = Channel<AuthUiEvent>(Channel.BUFFERED)
     val eventFlow = _eventChannel.receiveAsFlow()
 
-    private val _emailInput = MutableStateFlow("alex.dev@gmail.com")
+    private val _emailInput = MutableStateFlow("")
     val emailInput = _emailInput.asStateFlow()
 
-    private val _usernameInput = MutableStateFlow("AlexDeveloper")
+    private val _usernameInput = MutableStateFlow("")
     val usernameInput = _usernameInput.asStateFlow()
 
-    private val _passwordInput = MutableStateFlow("password123")
+    private val _passwordInput = MutableStateFlow("")
     val passwordInput = _passwordInput.asStateFlow()
 
     private val _isBusy = MutableStateFlow(false)

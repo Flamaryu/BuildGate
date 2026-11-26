@@ -338,24 +338,36 @@ class SupabaseEnrollmentRepository(
     }
 
     override suspend fun enrollInApp(appId: String, testerId: String): Enrollment {
-        val existing = getEnrollment(appId, testerId)
+        val signedInUid = client.auth.currentUserOrNull()?.id
+        if (signedInUid.isNullOrBlank()) {
+            return Enrollment(
+                id = "signed_out",
+                appId = appId,
+                testerId = testerId,
+                status = EnrollmentStatus.PENDING_INSTALL,
+                enrolledAtIso = BuildGateClock.nowIso()
+            )
+        }
+        val existing = getEnrollment(appId, signedInUid)
         if (existing != null) return existing
         val numericAppId = appId.toLongOrNull() ?: return Enrollment(
             id = "pending",
             appId = appId,
-            testerId = testerId,
+            testerId = signedInUid,
             status = EnrollmentStatus.PENDING_INSTALL,
             enrolledAtIso = BuildGateClock.nowIso()
         )
-        client.postgrest.rpc(
-            "start_test_session",
-            buildJsonObject { put("p_app_id", numericAppId) }
-        )
+        runCatching {
+            client.postgrest.rpc(
+                "start_test_session",
+                buildJsonObject { put("p_app_id", numericAppId) }
+            )
+        }
         refresh()
-        return getEnrollment(appId, testerId) ?: Enrollment(
+        return getEnrollment(appId, signedInUid) ?: Enrollment(
             id = "pending",
             appId = appId,
-            testerId = testerId,
+            testerId = signedInUid,
             enrolledAtIso = BuildGateClock.nowIso()
         )
     }

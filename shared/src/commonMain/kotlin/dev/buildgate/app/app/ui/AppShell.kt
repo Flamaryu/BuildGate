@@ -15,8 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -59,7 +61,8 @@ fun AppShell() {
     KoinApplication(application = { modules(appModule) }) {
         BuildGateTheme {
             val navController = rememberNavController()
-            var activeTab by remember { mutableStateOf(TopLevelTab.DISCOVERY) }
+            var activeTabName by rememberSaveable { mutableStateOf(TopLevelTab.DISCOVERY.name) }
+            val activeTab = TopLevelTab.entries.find { it.name == activeTabName } ?: TopLevelTab.DISCOVERY
 
             val authViewModel: AuthViewModel = koinScopedViewModel()
             val verifySessionViewModel: VerifySessionViewModel = koinScopedViewModel()
@@ -75,7 +78,7 @@ fun AppShell() {
 
             val authSession by authViewModel.sessionState.collectAsState()
             val allListings by appListingRepo.getListings().collectAsState(initial = emptyList())
-            val currentUserId = authSession.user?.id ?: "tester_1"
+            val currentUserId = authSession.user?.id ?: if (authSession.isDemoMode) "tester_1" else ""
             val currentUsername = authSession.profile?.username ?: "Tester"
 
             val incomingLink by DeepLinkRouter.incomingLinks.collectAsState()
@@ -152,14 +155,14 @@ fun AppShell() {
             }
 
             fun navigateTo(route: BuildGateRoute) {
-                activeTab = when (route) {
+                activeTabName = when (route) {
                     BuildGateRoute.Discovery -> TopLevelTab.DISCOVERY
                     BuildGateRoute.DailyQueue -> TopLevelTab.DAILY_QUEUE
                     is BuildGateRoute.AppCampaign -> TopLevelTab.DISCOVERY
                     is BuildGateRoute.TriageBoard, is BuildGateRoute.ProductionPacket -> TopLevelTab.TRIAGE_BOARD
                     BuildGateRoute.PublishApp -> TopLevelTab.PUBLISH_APP
                     BuildGateRoute.Account -> TopLevelTab.ACCOUNT
-                }
+                }.name
                 syncBrowserRouteHash(DeepLinkRouter.toWebHash(route))
                 navController.navigate(route) {
                     launchSingleTop = true
@@ -208,10 +211,8 @@ fun AppShell() {
                 }
             }
 
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val isWideScreen = maxWidth >= 840.dp
-
-                val navHostContent: @Composable (Modifier) -> Unit = { contentModifier ->
+            val movableNavHost = remember {
+                movableContentOf<Modifier> { contentModifier ->
                     NavHost(
                         navController = navController,
                         startDestination = BuildGateRoute.Discovery,
@@ -309,6 +310,10 @@ fun AppShell() {
                         }
                     }
                 }
+            }
+
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val isWideScreen = maxWidth >= 840.dp
 
                 if (isWideScreen) {
                     Row(modifier = Modifier.fillMaxSize()) {
@@ -325,7 +330,7 @@ fun AppShell() {
                                 )
                             }
                         }
-                        navHostContent(Modifier.weight(1f))
+                        movableNavHost(Modifier.weight(1f))
                     }
                 } else {
                     Scaffold(
@@ -345,7 +350,7 @@ fun AppShell() {
                             }
                         }
                     ) { innerPadding ->
-                        navHostContent(Modifier.padding(innerPadding))
+                        movableNavHost(Modifier.padding(innerPadding))
                     }
                 }
             }
