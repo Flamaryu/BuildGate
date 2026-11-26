@@ -57,12 +57,12 @@ High-priority features approved for upcoming milestones.
 
 | ID | Feature | Area | Votes / Engagement | Times Suggested | Priority | Summary |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| `BG-014` | **AI QA Mission Generator (Gemini)** | AI / Developer | 0 | 1 | P0 | Paste app description or release notes ➔ AI generates concrete, testable QA missions |
-| `BG-015` | **Randomized / Stratified Mission Assignment** | AI / QA | 0 | 1 | P0 | Randomly assigns different missions across your 16+ testers so every screen/flow gets coverage instead of everyone testing screen 1 |
-| `BG-016` | **Hosted Web Companion + HTTPS App Links** | Web / Infra | 0 | 1 | P0 | Deploy WasmJS/JS bundle to custom domain (`buildgate.dev`) with `.well-known/assetlinks.json` |
-| `BG-017` | **Smart Daily Streak Push Reminders (FCM + Cron)** | Retention | 0 | 1 | P1 | Remind testers 2h before UTC midnight if they have unverified queued apps; alert devs before Day-14 roster drops below 12 |
-| `BG-018` | **In-Overlay Mission Checklist & Pass/Fail Tap** | Android QA | 0 | 1 | P1 | Show the tester's assigned mission right inside the floating pill so they can mark Pass/Fail or attach proof without leaving the app |
-| `BG-019` | **Edit / Update Published Campaign & Build Version** | Developer | 0 | 1 | P1 | Let app owners bump `currentBuildVersion`, update Play/Group links, or upgrade from No-Code to Deep-Link Handshake |
+| `BG-011` | **AI QA Mission Generator (Gemini)** | AI / Developer | 0 | 1 | P0 | Paste app description or release notes ➔ AI generates concrete, testable QA missions |
+| `BG-012` | **Randomized / Stratified Mission Assignment** | AI / QA | 0 | 1 | P0 | Randomly assigns different missions across your 16+ testers so every screen/flow gets coverage instead of everyone testing screen 1 |
+| `BG-013` | **Hosted Web Companion + HTTPS App Links** | Web / Infra | 0 | 1 | P0 | Deploy WasmJS/JS bundle to custom domain (`buildgate.dev`) with `.well-known/assetlinks.json` |
+| `BG-014` | **Smart Daily Streak Push Reminders (FCM + Cron)** | Retention | 0 | 1 | P1 | Remind testers 2h before UTC midnight if they have unverified queued apps; alert devs before Day-14 roster drops below 12 |
+| `BG-010` | **In-Overlay Mission Checklist & Pass/Fail Tap** | Android QA | 0 | 1 | P1 | Show the tester's assigned mission right inside the floating pill so they can mark Pass/Fail or attach proof without leaving the app |
+| `BG-015` | **Edit / Update Published Campaign & Build Version** | Developer | 0 | 1 | P1 | Let app owners bump `currentBuildVersion`, update Play/Group links, or upgrade from No-Code to Deep-Link Handshake |
 
 ---
 
