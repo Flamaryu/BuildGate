@@ -44,6 +44,7 @@ import dev.buildgate.app.shared.session.ActiveQaSessionState
 import dev.buildgate.app.shared.session.CapturedQaMediaDraft
 import dev.buildgate.app.shared.session.GlobalQaSession
 import dev.buildgate.app.shared.session.OverlayBugSubmission
+import dev.buildgate.app.shared.session.OverlayMissionResult
 import dev.buildgate.app.shared.session.OverlayVerifyRequest
 import dev.buildgate.app.shared.session.QaMediaCaptureBus
 import dev.buildgate.app.shared.session.QaOverlayController
@@ -101,6 +102,7 @@ class QaOverlayService : Service() {
     private enum class OverlayMode {
         COLLAPSED_PILL,
         EXPANDED_MENU,
+        MISSIONS_CHECKLIST,
         INLINE_BUG_SHEET
     }
 
@@ -123,6 +125,8 @@ class QaOverlayService : Service() {
     private var pendingVideoBytes: ByteArray? = null
     private var pendingMediaDurationMs: Int? = null
     private var pendingPreviewPath: String? = null
+    private var prefilledBugTitle: String = ""
+    private var prefilledBugDesc: String = ""
 
     private val tickerRunnable = object : Runnable {
         override fun run() {
@@ -601,6 +605,13 @@ class QaOverlayService : Service() {
                     card.addView(returnTargetBtn)
                 }
 
+                val missions = snap.activeAppMissions
+                if (missions.isNotEmpty()) {
+                    val doneCount = missions.count { it.isCompleted }
+                    card.addView(menuButton("🎯 QA Missions ($doneCount/${missions.size} Done)") {
+                        switchOverlayMode(OverlayMode.MISSIONS_CHECKLIST)
+                    })
+                }
                 card.addView(menuButton("📸 1-Tap Screenshot & Pause") {
                     if (mediaProjection == null) requestMediaProjectionConsent(ACTION_CAPTURE_SCREENSHOT)
                     else captureOneTapScreenshot()
@@ -630,6 +641,138 @@ class QaOverlayService : Service() {
                 })
 
                 container.addView(card)
+            }
+
+            OverlayMode.MISSIONS_CHECKLIST -> {
+                val sheet = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    background = roundedBg(Color.parseColor("#181825"), Color.parseColor("#818CF8"), 20)
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                }
+
+                val missions = snap.activeAppMissions
+                val doneCount = missions.count { it.isCompleted }
+                val header = TextView(this).apply {
+                    text = "🎯 QA Missions • $appTitle ($doneCount/${missions.size})"
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    textSize = 13f
+                    setPadding(0, 0, 0, dp(8))
+                }
+                sheet.addView(header)
+
+                if (missions.isEmpty()) {
+                    val emptyText = TextView(this).apply {
+                        text = "No developer missions for this build yet."
+                        setTextColor(Color.parseColor("#CBD5E1"))
+                        textSize = 12f
+                        setPadding(0, dp(4), 0, dp(10))
+                    }
+                    sheet.addView(emptyText)
+                } else {
+                    missions.take(4).forEach { mission ->
+                        val itemCard = LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                            background = roundedBg(
+                                fillColor = if (mission.isCompleted) Color.parseColor("#064E3B") else Color.parseColor("#27273A"),
+                                strokeColor = if (mission.isCompleted) Color.parseColor("#34D399") else Color.parseColor("#475569"),
+                                radiusDp = 12
+                            )
+                            setPadding(dp(10), dp(8), dp(10), dp(8))
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            ).apply { bottomMargin = dp(8) }
+                        }
+
+                        val titleTv = TextView(this).apply {
+                            text = (if (mission.isCompleted) "✅ " else "○ ") + mission.title
+                            setTextColor(Color.WHITE)
+                            typeface = Typeface.DEFAULT_BOLD
+                            textSize = 12f
+                        }
+                        itemCard.addView(titleTv)
+
+                        if (mission.instructions.isNotBlank()) {
+                            val instrTv = TextView(this).apply {
+                                text = mission.instructions
+                                setTextColor(Color.parseColor("#CBD5E1"))
+                                textSize = 11f
+                                setPadding(0, dp(2), 0, dp(6))
+                            }
+                            itemCard.addView(instrTv)
+                        }
+
+                        val actionRow = LinearLayout(this).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                        }
+
+                        val passBtn = Button(this).apply {
+                            text = if (mission.isCompleted) "Passed ✅" else "✅ Pass"
+                            isAllCaps = false
+                            textSize = 11.5f
+                            setTextColor(Color.WHITE)
+                            background = roundedBg(
+                                fillColor = if (mission.isCompleted) Color.parseColor("#047857") else Color.parseColor("#059669"),
+                                strokeColor = Color.parseColor("#34D399"),
+                                radiusDp = 8
+                            )
+                            setPadding(dp(8), dp(4), dp(8), dp(4))
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                                marginEnd = dp(6)
+                            }
+                            setOnClickListener {
+                                val nextDone = !mission.isCompleted
+                                GlobalQaSession.coordinator.markMissionCompleted(mission.id, nextDone)
+                                val activeAppId = snap.activeApp?.id ?: ""
+                                if (activeAppId.isNotBlank()) {
+                                    QaMediaCaptureBus.publishMissionResult(
+                                        OverlayMissionResult(
+                                            missionId = mission.id,
+                                            appId = activeAppId,
+                                            testerId = snap.testerId ?: "tester_1",
+                                            passed = nextDone
+                                        )
+                                    )
+                                }
+                                rebuildOverlayContent(OverlayMode.MISSIONS_CHECKLIST)
+                            }
+                        }
+
+                        val failBtn = Button(this).apply {
+                            text = "❌ Fail & Bug"
+                            isAllCaps = false
+                            textSize = 11.5f
+                            setTextColor(Color.WHITE)
+                            background = roundedBg(
+                                fillColor = Color.parseColor("#991B1B"),
+                                strokeColor = Color.parseColor("#F87171"),
+                                radiusDp = 8
+                            )
+                            setPadding(dp(8), dp(4), dp(8), dp(4))
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            setOnClickListener {
+                                GlobalQaSession.coordinator.pauseForFeedback("Failed Mission: ${mission.title}")
+                                prefilledBugTitle = "[Mission Failed] ${mission.title}"
+                                prefilledBugDesc = "Mission: ${mission.instructions}\n\nWhat went wrong: "
+                                switchOverlayMode(OverlayMode.INLINE_BUG_SHEET)
+                            }
+                        }
+
+                        actionRow.addView(passBtn)
+                        actionRow.addView(failBtn)
+                        itemCard.addView(actionRow)
+                        sheet.addView(itemCard)
+                    }
+                }
+
+                sheet.addView(menuButton("← Back to QA Menu") {
+                    switchOverlayMode(OverlayMode.EXPANDED_MENU)
+                })
+                sheet.addView(menuButton("✕ Minimize Pill") {
+                    switchOverlayMode(OverlayMode.COLLAPSED_PILL)
+                })
+                container.addView(sheet)
             }
 
             OverlayMode.INLINE_BUG_SHEET -> {
@@ -663,6 +806,7 @@ class QaOverlayService : Service() {
 
                 val titleInput = EditText(this).apply {
                     hint = "Bug / Friction Title"
+                    if (prefilledBugTitle.isNotBlank()) setText(prefilledBugTitle)
                     setHintTextColor(Color.parseColor("#94A3B8"))
                     setTextColor(Color.WHITE)
                     background = roundedBg(Color.parseColor("#27273A"), Color.parseColor("#475569"), 10)
@@ -673,6 +817,7 @@ class QaOverlayService : Service() {
 
                 val descInput = EditText(this).apply {
                     hint = "What happened?"
+                    if (prefilledBugDesc.isNotBlank()) setText(prefilledBugDesc)
                     setHintTextColor(Color.parseColor("#94A3B8"))
                     setTextColor(Color.WHITE)
                     background = roundedBg(Color.parseColor("#27273A"), Color.parseColor("#475569"), 10)
@@ -693,6 +838,8 @@ class QaOverlayService : Service() {
                     text = "Cancel & Resume"
                     isAllCaps = false
                     setOnClickListener {
+                        prefilledBugTitle = ""
+                        prefilledBugDesc = ""
                         clearPendingAttachments()
                         GlobalQaSession.coordinator.resumeFromFeedback()
                         switchOverlayMode(OverlayMode.COLLAPSED_PILL)
@@ -727,6 +874,8 @@ class QaOverlayService : Service() {
                                 )
                             )
                         }
+                        prefilledBugTitle = ""
+                        prefilledBugDesc = ""
                         clearPendingAttachments()
                         GlobalQaSession.coordinator.resumeFromFeedback()
                         switchOverlayMode(OverlayMode.COLLAPSED_PILL)

@@ -394,6 +394,39 @@ class BuildGateCoreTest {
         assertTrue(ownerState.ownedApps.any { it.id == "app_1" })
     }
 
+    @Test
+    fun qaSessionCoordinator_tracksMissionsAcrossQueue_andMarksPassedInOverlay() {
+        var nowMs = 1_000L
+        val coordinator = QaSessionCoordinator { nowMs }
+        val app1 = sampleApp("app_1", "com.mkdinteractive.shatterhorde")
+        val app2 = sampleApp("app_2", "com.cozybento.bento_puzzle")
+        val m1 = dev.buildgate.app.entities.testmission.model.TestMission(
+            id = "m1", appId = "app_1", buildVersion = "v1.6.0",
+            title = "Survive Wave 3", instructions = "Test upgrades"
+        )
+        val m2 = dev.buildgate.app.entities.testmission.model.TestMission(
+            id = "m2", appId = "app_2", buildVersion = "v1.3.1",
+            title = "Solve 2 Bento Puzzles", instructions = "Check edge snap"
+        )
+
+        coordinator.startQueue(
+            apps = listOf(app1, app2),
+            testerId = "tester_1",
+            missionsByAppId = mapOf("app_1" to listOf(m1), "app_2" to listOf(m2))
+        )
+        coordinator.startAppSession(app1, "enr_1", "tester_1", "bg_1")
+        assertEquals(1, coordinator.state.value.activeAppMissions.size)
+        assertFalse(coordinator.state.value.activeAppMissions.first().isCompleted)
+
+        coordinator.markMissionCompleted("m1", completed = true)
+        assertTrue(coordinator.state.value.activeAppMissions.first().isCompleted)
+
+        // Advancing directly to app_2 swaps activeAppMissions to app_2's missions
+        coordinator.advanceAndStartNextQueuedApp("bg_2")
+        assertEquals("m2", coordinator.state.value.activeAppMissions.first().id)
+        assertFalse(coordinator.state.value.activeAppMissions.first().isCompleted)
+    }
+
     private fun sampleApp(id: String, pkg: String) = AppListing(
         id = id,
         ownerId = "owner_1",

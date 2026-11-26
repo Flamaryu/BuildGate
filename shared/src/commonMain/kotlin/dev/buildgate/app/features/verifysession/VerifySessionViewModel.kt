@@ -240,7 +240,7 @@ class VerifySessionViewModel(
                 runCatching { enrollmentRepository.enrollInApp(currentApp.id, effectiveTesterId) }
             }
 
-            // Ensure the QA overlay always knows the full remaining daily queue — even when launched
+            // Ensure the QA overlay always knows the full remaining daily queue & missions — even when launched
             // from Discovery or after closing the pill via stopSession().
             val existingQueue = sessionCoordinator.state.value.queueApps
             if (existingQueue.isEmpty() || existingQueue.none { it.id == currentApp.id }) {
@@ -255,7 +255,17 @@ class VerifySessionViewModel(
                     }
                     .mapNotNull { enr -> allListings.find { it.id == enr.appId } }
                 val orderedQueue = listOf(currentApp) + remainingEnrolled
-                sessionCoordinator.startQueue(orderedQueue, effectiveTesterId)
+                val missionsMap = orderedQueue.associate { queuedApp ->
+                    queuedApp.id to runCatching {
+                        appListingRepository.getMissionsForApp(queuedApp.id).first()
+                    }.getOrDefault(emptyList())
+                }
+                sessionCoordinator.startQueue(orderedQueue, effectiveTesterId, missionsMap)
+            } else {
+                val currentMissions = runCatching {
+                    appListingRepository.getMissionsForApp(currentApp.id).first()
+                }.getOrDefault(emptyList())
+                sessionCoordinator.setMissionsForApp(currentApp.id, currentMissions)
             }
 
             sessionCoordinator.startAppSession(

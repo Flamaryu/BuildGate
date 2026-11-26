@@ -47,6 +47,13 @@ data class OverlayVerifyRequest(
     val installedVersionCode: Long?
 )
 
+data class OverlayMissionResult(
+    val missionId: String,
+    val appId: String,
+    val testerId: String,
+    val passed: Boolean
+)
+
 object QaMediaCaptureBus {
     private val _pendingDraft = MutableStateFlow<CapturedQaMediaDraft?>(null)
     val pendingDraft: StateFlow<CapturedQaMediaDraft?> = _pendingDraft.asStateFlow()
@@ -56,6 +63,9 @@ object QaMediaCaptureBus {
 
     private val _overlayVerifyRequests = Channel<OverlayVerifyRequest>(Channel.BUFFERED)
     val overlayVerifyRequests = _overlayVerifyRequests.receiveAsFlow()
+
+    private val _overlayMissionResults = Channel<OverlayMissionResult>(Channel.BUFFERED)
+    val overlayMissionResults = _overlayMissionResults.receiveAsFlow()
 
     fun publishCapturedDraft(draft: CapturedQaMediaDraft) {
         _pendingDraft.value = draft
@@ -71,5 +81,9 @@ object QaMediaCaptureBus {
 
     fun requestVerifyFromOverlay(request: OverlayVerifyRequest) {
         _overlayVerifyRequests.trySend(request)
+    }
+
+    fun publishMissionResult(result: OverlayMissionResult) {
+        _overlayMissionResults.trySend(result)
     }
 }

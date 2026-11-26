@@ -1,6 +1,7 @@
 package dev.buildgate.app.shared.session
 
 import dev.buildgate.app.entities.applisting.model.AppListing
+import dev.buildgate.app.entities.testmission.model.TestMission
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,7 @@ data class ActiveQaSessionState(
     val testerId: String? = null,
     val sessionToken: String = "",
     val queueApps: List<AppListing> = emptyList(),
+    val missionsByAppId: Map<String, List<TestMission>> = emptyMap(),
     val currentQueueIndex: Int = 0,
     val targetDurationMs: Long = 60_000L,
     val accumulatedActiveMs: Long = 0L,
@@ -50,6 +52,9 @@ data class ActiveQaSessionState(
 
     val nextQueuedApp: AppListing?
         get() = queueApps.getOrNull(currentQueueIndex + 1)
+
+    val activeAppMissions: List<TestMission>
+        get() = activeApp?.let { missionsByAppId[it.id] }.orEmpty()
 }
 
 interface QaOverlayController {
@@ -69,7 +74,11 @@ class QaSessionCoordinator(
         overlayController = controller
     }
 
-    fun startQueue(apps: List<AppListing>, testerId: String) {
+    fun startQueue(
+        apps: List<AppListing>,
+        testerId: String,
+        missionsByAppId: Map<String, List<TestMission>> = emptyMap()
+    ) {
         if (apps.isEmpty()) return
         _state.update {
             ActiveQaSessionState(
@@ -77,8 +86,34 @@ class QaSessionCoordinator(
                 activeApp = apps.first(),
                 testerId = testerId,
                 queueApps = apps,
+                missionsByAppId = missionsByAppId,
                 currentQueueIndex = 0
             )
+        }
+    }
+
+    fun setMissionsForApp(appId: String, missions: List<TestMission>) {
+        _state.update { prev ->
+            val updatedMap = prev.missionsByAppId.toMutableMap().apply { put(appId, missions) }
+            val next = prev.copy(missionsByAppId = updatedMap)
+            if (prev.phase != QaSessionPhase.IDLE && prev.activeApp?.id == appId) {
+                overlayController?.onSessionUpdated(next)
+            }
+            next
+        }
+    }
+
+    fun markMissionCompleted(missionId: String, completed: Boolean = true) {
+        _state.update { prev ->
+            val activeId = prev.activeApp?.id ?: return@update prev
+            val currentList = prev.missionsByAppId[activeId] ?: return@update prev
+            val updatedList = currentList.map { m ->
+                if (m.id == missionId) m.copy(isCompleted = completed) else m
+            }
+            val updatedMap = prev.missionsByAppId.toMutableMap().apply { put(activeId, updatedList) }
+            val next = prev.copy(missionsByAppId = updatedMap)
+            overlayController?.onSessionUpdated(next)
+            next
         }
     }
 

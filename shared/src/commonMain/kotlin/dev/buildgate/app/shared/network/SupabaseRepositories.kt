@@ -296,8 +296,31 @@ class SupabaseAppListingRepository(
     }
 
     override suspend fun toggleMissionCompletion(missionId: String) {
+        var newCompleted = false
         missionsState.value = missionsState.value.map {
-            if (it.id == missionId) it.copy(isCompleted = !it.isCompleted) else it
+            if (it.id == missionId) {
+                newCompleted = !it.isCompleted
+                it.copy(isCompleted = newCompleted)
+            } else it
+        }
+        val uid = client.auth.currentUserOrNull()?.id ?: return
+        val numericMissionId = missionId.toLongOrNull() ?: return
+        runCatching {
+            if (newCompleted) {
+                client.from("mission_completions").upsert(
+                    buildJsonObject {
+                        put("mission_id", numericMissionId)
+                        put("tester_id", uid)
+                    }
+                )
+            } else {
+                client.from("mission_completions").delete {
+                    filter {
+                        eq("mission_id", numericMissionId)
+                        eq("tester_id", uid)
+                    }
+                }
+            }
         }
     }
 }

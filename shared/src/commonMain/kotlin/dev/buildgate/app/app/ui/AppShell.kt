@@ -128,6 +128,13 @@ fun AppShell() {
                 }
             }
 
+            // Persist mission Pass/Fail checkoffs triggered directly inside the Floating QA Overlay
+            LaunchedEffect(Unit) {
+                QaMediaCaptureBus.overlayMissionResults.collect { res ->
+                    runCatching { appListingRepo.toggleMissionCompletion(res.missionId) }
+                }
+            }
+
             // Persist daily verifications triggered directly from the Floating QA Overlay's "Verify & Next" button
             LaunchedEffect(currentUserId) {
                 QaMediaCaptureBus.overlayVerifyRequests.collect { req ->
