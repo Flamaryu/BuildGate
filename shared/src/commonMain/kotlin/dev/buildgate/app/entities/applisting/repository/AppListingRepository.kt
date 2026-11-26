@@ -15,6 +15,7 @@ interface AppListingRepository {
     suspend fun getListingById(id: String): AppListing?
     suspend fun getListingByPackage(packageName: String): AppListing?
     suspend fun createListing(listing: AppListing): AppListing
+    suspend fun updateListing(listing: AppListing): AppListing
     fun getMissionsForApp(appId: String): Flow<List<TestMission>>
     suspend fun createMission(mission: TestMission)
     suspend fun toggleMissionCompletion(missionId: String)
@@ -164,6 +165,28 @@ class DemoAppListingRepository : AppListingRepository {
         )
         listingsState.update { listOf(created) + it }
         return created
+    }
+
+    override suspend fun updateListing(listing: AppListing): AppListing {
+        listingsState.update { list ->
+            list.map { existing ->
+                if (existing.id == listing.id || existing.packageName == listing.packageName) {
+                    existing.copy(
+                        title = listing.title,
+                        shortSummary = listing.shortSummary,
+                        playStoreOptInUrl = listing.playStoreOptInUrl,
+                        googleGroupUrl = listing.googleGroupUrl,
+                        deepLinkScheme = listing.deepLinkScheme,
+                        currentBuildVersion = listing.currentBuildVersion,
+                        minVersionCode = listing.minVersionCode,
+                        targetDays = listing.targetDays,
+                        targetTesters = listing.targetTesters,
+                        category = listing.category
+                    )
+                } else existing
+            }
+        }
+        return listingsState.value.find { it.id == listing.id || it.packageName == listing.packageName } ?: listing
     }
 
     override fun getMissionsForApp(appId: String): Flow<List<TestMission>> =

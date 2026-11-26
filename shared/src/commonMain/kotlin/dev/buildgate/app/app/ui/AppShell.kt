@@ -167,7 +167,7 @@ fun AppShell() {
                     BuildGateRoute.DailyQueue -> TopLevelTab.DAILY_QUEUE
                     is BuildGateRoute.AppCampaign -> TopLevelTab.DISCOVERY
                     is BuildGateRoute.TriageBoard, is BuildGateRoute.ProductionPacket -> TopLevelTab.TRIAGE_BOARD
-                    BuildGateRoute.PublishApp -> TopLevelTab.PUBLISH_APP
+                    BuildGateRoute.PublishApp, is BuildGateRoute.EditApp -> TopLevelTab.PUBLISH_APP
                     BuildGateRoute.Account -> TopLevelTab.ACCOUNT
                 }.name
                 syncBrowserRouteHash(DeepLinkRouter.toWebHash(route))
@@ -274,6 +274,9 @@ fun AppShell() {
                                 onOpenProductionPacket = { targetAppId ->
                                     navigateTo(BuildGateRoute.ProductionPacket(targetAppId))
                                 },
+                                onEditCampaign = { targetAppId ->
+                                    navigateTo(BuildGateRoute.EditApp(targetAppId))
+                                },
                                 onNavigateToAccount = {
                                     navigateTo(BuildGateRoute.Account)
                                 },
@@ -303,9 +306,27 @@ fun AppShell() {
                                 ownerId = currentUserId,
                                 ownerKarma = authSession.profile?.karmaPoints ?: 50,
                                 isSignedIn = authSession.isLoggedIn,
+                                editAppId = null,
                                 viewModel = publishAppViewModel,
                                 onPublished = { publishedPkg ->
                                     navigateTo(BuildGateRoute.AppCampaign(publishedPkg))
+                                },
+                                onNavigateToAccount = {
+                                    navigateTo(BuildGateRoute.Account)
+                                }
+                            )
+                        }
+
+                        composable<BuildGateRoute.EditApp> { backStackEntry ->
+                            val route: BuildGateRoute.EditApp = backStackEntry.toRoute()
+                            PublishAppPage(
+                                ownerId = currentUserId,
+                                ownerKarma = authSession.profile?.karmaPoints ?: 50,
+                                isSignedIn = authSession.isLoggedIn,
+                                editAppId = route.appId,
+                                viewModel = publishAppViewModel,
+                                onPublished = { _ ->
+                                    navigateTo(BuildGateRoute.TriageBoard(route.appId))
                                 },
                                 onNavigateToAccount = {
                                     navigateTo(BuildGateRoute.Account)

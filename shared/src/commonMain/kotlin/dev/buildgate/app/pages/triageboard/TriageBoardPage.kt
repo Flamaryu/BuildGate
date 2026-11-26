@@ -82,6 +82,7 @@ fun TriageBoardPage(
     testerUsername: String = "Tester",
     isSignedIn: Boolean = false,
     onOpenProductionPacket: (String) -> Unit = {},
+    onEditCampaign: (String) -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
     onNavigateToDiscovery: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -165,12 +166,17 @@ fun TriageBoardPage(
                 },
                 actions = {
                     if (triageState.canTriage && currentApp != null) {
+                        TextButton(
+                            onClick = { onEditCampaign(currentApp.id) }
+                        ) {
+                            Text("✏️ Edit")
+                        }
                         OutlinedButton(
                             onClick = { onOpenProductionPacket(currentApp.id) },
                             modifier = Modifier.padding(end = 12.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Export Play Packet")
+                            Text("Play Packet")
                         }
                     }
                 }
@@ -405,6 +411,13 @@ fun TriageBoardPage(
                                     shape = RoundedCornerShape(14.dp)
                                 ) {
                                     Text("📦 Open Google Play Production Access Packet")
+                                }
+                                OutlinedButton(
+                                    onClick = { onEditCampaign(currentApp.id) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) {
+                                    Text("✏️ Edit Campaign, Build Version & Deep-Link Settings")
                                 }
                             }
                         }

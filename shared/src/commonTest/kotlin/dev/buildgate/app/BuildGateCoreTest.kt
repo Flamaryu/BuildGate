@@ -427,6 +427,29 @@ class BuildGateCoreTest {
         assertFalse(coordinator.state.value.activeAppMissions.first().isCompleted)
     }
 
+    @Test
+    fun appListingRepository_updatesBuildVersionAndUpgradesToDeepLinkHandshake() = runTest {
+        val repo = dev.buildgate.app.entities.applisting.repository.DemoAppListingRepository()
+        val original = repo.getListingById("app_1")!!
+        assertEquals("v1.6.0", original.currentBuildVersion)
+        assertNull(original.deepLinkScheme)
+
+        val updated = repo.updateListing(
+            original.copy(
+                currentBuildVersion = "v1.6.1",
+                minVersionCode = 8L,
+                deepLinkScheme = "buildgate.com.mkdinteractive.shatterhorde"
+            )
+        )
+        assertEquals("v1.6.1", updated.currentBuildVersion)
+        assertEquals(8L, updated.minVersionCode)
+        assertTrue(updated.hasDeepLinkHandshake)
+
+        val fetched = repo.getListingById("app_1")!!
+        assertEquals("v1.6.1", fetched.currentBuildVersion)
+        assertEquals("buildgate.com.mkdinteractive.shatterhorde", fetched.deepLinkScheme)
+    }
+
     private fun sampleApp(id: String, pkg: String) = AppListing(
         id = id,
         ownerId = "owner_1",

@@ -58,6 +58,7 @@ fun PublishAppPage(
     ownerId: String,
     ownerKarma: Int,
     isSignedIn: Boolean = true,
+    editAppId: String? = null,
     viewModel: PublishAppViewModel,
     onPublished: (String) -> Unit,
     onNavigateToAccount: () -> Unit = {},
@@ -67,6 +68,14 @@ fun PublishAppPage(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val platformVerifier: PlatformVerifier = koinInject()
+
+    LaunchedEffect(editAppId) {
+        if (!editAppId.isNullOrBlank()) {
+            viewModel.loadForEditing(editAppId)
+        } else {
+            viewModel.resetForNewCampaign()
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -83,15 +92,15 @@ fun PublishAppPage(
                 title = {
                     Column {
                         Text(
-                            text = "Publish Closed-Testing Campaign",
+                            text = if (state.isEditMode) "Edit Campaign & Build Version" else "Publish Closed-Testing Campaign",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isSignedIn) {
-                                "Your Karma ($ownerKarma ⚡) boosts your app's Discovery rank automatically"
-                            } else {
-                                "Sign in or create a free account to publish your closed-testing app"
+                            text = when {
+                                !isSignedIn -> "Sign in or create a free account to publish your closed-testing app"
+                                state.isEditMode -> "Update build version, links, or upgrade to Tier-2 Deep-Link Handshake"
+                                else -> "Your Karma ($ownerKarma ⚡) boosts your app's Discovery rank automatically"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
@@ -178,7 +187,13 @@ fun PublishAppPage(
                         OutlinedTextField(
                             value = state.packageName,
                             onValueChange = { viewModel.onPackageNameChanged(it) },
-                            label = { Text("Android Package ID (e.g., io.focuspulse.app)") },
+                            enabled = !state.isEditMode,
+                            label = {
+                                Text(
+                                    if (state.isEditMode) "Android Package ID (locked after publishing)"
+                                    else "Android Package ID (e.g., com.studio.myapp)"
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -215,18 +230,26 @@ fun PublishAppPage(
                             OutlinedTextField(
                                 value = state.currentBuildVersion,
                                 onValueChange = { viewModel.onBuildVersionChanged(it) },
-                                label = { Text("Current Build Tag") },
+                                label = { Text("Build Version (e.g., v1.6.1)") },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
                             )
                             OutlinedTextField(
-                                value = state.targetTesters,
-                                onValueChange = { viewModel.onTargetTestersChanged(it) },
-                                label = { Text("Target Testers (16+ rec.)") },
+                                value = state.minVersionCode,
+                                onValueChange = { viewModel.onMinVersionCodeChanged(it) },
+                                label = { Text("Min VersionCode") },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
+
+                        OutlinedTextField(
+                            value = state.targetTesters,
+                            onValueChange = { viewModel.onTargetTestersChanged(it) },
+                            label = { Text("Target Testers (16+ recommended for Google Play)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
                     }
                 }
             }
@@ -547,7 +570,14 @@ fun PublishAppPage(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text(if (state.isSubmitting) "Publishing..." else "🚀 Launch 14-Day Campaign")
+                            Text(
+                                when {
+                                    state.isSubmitting && state.isEditMode -> "Saving Changes..."
+                                    state.isSubmitting -> "Publishing..."
+                                    state.isEditMode -> "💾 Save Campaign Changes"
+                                    else -> "🚀 Launch 14-Day Campaign"
+                                }
+                            )
                         }
                     }
                 }

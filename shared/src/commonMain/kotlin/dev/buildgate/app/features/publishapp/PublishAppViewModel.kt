@@ -32,12 +32,14 @@ data class SplitDeepLinkSnippet(
 )
 
 data class PublishAppUiState(
+    val editingAppId: String? = null,
     val title: String = "",
     val packageName: String = "",
     val shortSummary: String = "",
     val googleGroupUrl: String = "https://groups.google.com/g/",
     val playStoreOptInUrl: String = "https://play.google.com/apps/testing/",
     val currentBuildVersion: String = "v1.0.0-rc1",
+    val minVersionCode: String = "1",
     val targetTesters: String = "16",
     val category: String = "Productivity",
     val enableDeepLinkHandshake: Boolean = false,
@@ -47,6 +49,8 @@ data class PublishAppUiState(
     val initialMissionInstructions: String = "",
     val isSubmitting: Boolean = false
 ) {
+    val isEditMode: Boolean
+        get() = !editingAppId.isNullOrBlank()
     /**
      * Unified, globally collision-free custom URI scheme derived automatically from the Android package ID
      * (valid RFC 3986 scheme syntax: lowercase letters, digits, dots, hyphens).
@@ -229,8 +233,35 @@ class PublishAppViewModel(
 
     private val packageRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
 
+    fun loadForEditing(appId: String) {
+        viewModelScope.launch {
+            val existing = appListingRepository.getListingById(appId) ?: return@launch
+            _uiState.value = PublishAppUiState(
+                editingAppId = existing.id,
+                title = existing.title,
+                packageName = existing.packageName,
+                shortSummary = existing.shortSummary,
+                googleGroupUrl = existing.googleGroupUrl,
+                playStoreOptInUrl = existing.playStoreOptInUrl,
+                currentBuildVersion = existing.currentBuildVersion,
+                minVersionCode = existing.minVersionCode.toString(),
+                targetTesters = existing.targetTesters.toString(),
+                category = existing.category,
+                enableDeepLinkHandshake = existing.hasDeepLinkHandshake,
+                deepLinkScheme = existing.deepLinkScheme.orEmpty()
+            )
+        }
+    }
+
+    fun resetForNewCampaign() {
+        if (_uiState.value.isEditMode) {
+            _uiState.value = PublishAppUiState()
+        }
+    }
+
     fun onTitleChanged(v: String) { _uiState.update { it.copy(title = v) } }
     fun onPackageNameChanged(v: String) {
+        if (_uiState.value.isEditMode) return
         val clean = v.trim()
         _uiState.update {
             it.copy(
@@ -245,6 +276,7 @@ class PublishAppViewModel(
     fun onGoogleGroupUrlChanged(v: String) { _uiState.update { it.copy(googleGroupUrl = v) } }
     fun onPlayOptInUrlChanged(v: String) { _uiState.update { it.copy(playStoreOptInUrl = v) } }
     fun onBuildVersionChanged(v: String) { _uiState.update { it.copy(currentBuildVersion = v) } }
+    fun onMinVersionCodeChanged(v: String) { _uiState.update { it.copy(minVersionCode = v.filter { ch -> ch.isDigit() }) } }
     fun onTargetTestersChanged(v: String) { _uiState.update { it.copy(targetTesters = v) } }
     fun onCategoryChanged(v: String) { _uiState.update { it.copy(category = v) } }
     fun onToggleDeepLinkHandshake(enabled: Boolean) { _uiState.update { it.copy(enableDeepLinkHandshake = enabled) } }
@@ -277,24 +309,28 @@ class PublishAppViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true) }
-            val created = runCatching {
-                appListingRepository.createListing(
-                    AppListing(
-                        id = "",
-                        ownerId = ownerId,
-                        packageName = pkg,
-                        title = s.title.trim(),
-                        shortSummary = s.shortSummary.trim().ifBlank { "14-day closed testing campaign on BuildGate" },
-                        playStoreOptInUrl = s.playStoreOptInUrl.trim(),
-                        googleGroupUrl = s.googleGroupUrl.trim(),
-                        deepLinkScheme = if (s.enableDeepLinkHandshake) s.resolvedDeepLinkScheme else null,
-                        currentBuildVersion = s.currentBuildVersion.trim().ifBlank { "v1.0.0" },
-                        targetTesters = (s.targetTesters.toIntOrNull() ?: 16).coerceAtLeast(12),
-                        ownerKarmaBalance = ownerKarma,
-                        category = s.category.trim().ifBlank { "Productivity" },
-                        createdAtIso = BuildGateClock.nowIso()
-                    )
-                )
+            val payload = AppListing(
+                id = s.editingAppId.orEmpty(),
+                ownerId = ownerId,
+                packageName = pkg,
+                title = s.title.trim(),
+                shortSummary = s.shortSummary.trim().ifBlank { "14-day closed testing campaign on BuildGate" },
+                playStoreOptInUrl = s.playStoreOptInUrl.trim(),
+                googleGroupUrl = s.googleGroupUrl.trim(),
+                deepLinkScheme = if (s.enableDeepLinkHandshake) s.resolvedDeepLinkScheme else null,
+                currentBuildVersion = s.currentBuildVersion.trim().ifBlank { "v1.0.0" },
+                minVersionCode = (s.minVersionCode.toLongOrNull() ?: 1L).coerceAtLeast(1L),
+                targetTesters = (s.targetTesters.toIntOrNull() ?: 16).coerceAtLeast(12),
+                ownerKarmaBalance = ownerKarma,
+                category = s.category.trim().ifBlank { "Productivity" },
+                createdAtIso = BuildGateClock.nowIso()
+            )
+            val saved = runCatching {
+                if (s.isEditMode) {
+                    appListingRepository.updateListing(payload)
+                } else {
+                    appListingRepository.createListing(payload)
+                }
             }.getOrElse { err ->
                 _uiState.update { it.copy(isSubmitting = false) }
                 val raw = err.message.orEmpty()
@@ -302,19 +338,19 @@ class PublishAppViewModel(
                     raw.contains("23505") || raw.contains("app_listings_package_name_key") ->
                         "This package ID ($pkg) is already published on BuildGate! Check the Discover tab."
                     raw.contains("row-level security") || raw.contains("42501") ->
-                        "Please sign in on the Account tab before publishing an app."
-                    else -> raw.lineSequence().firstOrNull()?.take(140) ?: "Failed to publish campaign"
+                        "Only the app owner can update this campaign."
+                    else -> raw.lineSequence().firstOrNull()?.take(140) ?: "Failed to save campaign"
                 }
                 _eventChannel.send(PublishAppEvent.ShowMessage(friendly))
                 return@launch
             }
 
-            if (s.initialMissionTitle.isNotBlank()) {
+            if (!s.isEditMode && s.initialMissionTitle.isNotBlank()) {
                 appListingRepository.createMission(
                     TestMission(
                         id = "m_${(1000..9999).random()}",
-                        appId = created.id,
-                        buildVersion = created.currentBuildVersion,
+                        appId = saved.id,
+                        buildVersion = saved.currentBuildVersion,
                         title = s.initialMissionTitle.trim(),
                         instructions = s.initialMissionInstructions.trim().ifBlank { "Test core flow and report any UX friction." },
                         isRequired = true
@@ -323,8 +359,13 @@ class PublishAppViewModel(
             }
 
             _uiState.value = PublishAppUiState()
-            _eventChannel.send(PublishAppEvent.ShowMessage("Published ${created.title}!"))
-            _eventChannel.send(PublishAppEvent.Published(created.packageName))
+            _eventChannel.send(
+                PublishAppEvent.ShowMessage(
+                    if (s.isEditMode) "Updated ${saved.title} (${saved.currentBuildVersion})!"
+                    else "Published ${saved.title}!"
+                )
+            )
+            _eventChannel.send(PublishAppEvent.Published(saved.packageName))
         }
     }
 }

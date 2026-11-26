@@ -37,6 +37,9 @@ sealed interface BuildGateRoute {
     data object PublishApp : BuildGateRoute
 
     @Serializable
+    data class EditApp(val appId: String) : BuildGateRoute
+
+    @Serializable
     data object Account : BuildGateRoute
 }
 
@@ -75,6 +78,7 @@ object DeepLinkRouter {
         is BuildGateRoute.TriageBoard -> "#/triage/${route.appId}"
         is BuildGateRoute.ProductionPacket -> "#/packet/${route.appId}"
         BuildGateRoute.PublishApp -> "#/publish"
+        is BuildGateRoute.EditApp -> "#/edit/${route.appId}"
         BuildGateRoute.Account -> "#/account"
     }
 
@@ -118,6 +122,9 @@ object DeepLinkRouter {
         return when (segments[0]) {
             "queue" -> IncomingDeepLink.Navigate(BuildGateRoute.DailyQueue)
             "publish" -> IncomingDeepLink.Navigate(BuildGateRoute.PublishApp)
+            "edit" -> segments.getOrNull(1)?.let {
+                IncomingDeepLink.Navigate(BuildGateRoute.EditApp(it))
+            }
             "account" -> IncomingDeepLink.Navigate(BuildGateRoute.Account)
             "app" -> segments.getOrNull(1)?.let {
                 IncomingDeepLink.Navigate(BuildGateRoute.AppCampaign(it))

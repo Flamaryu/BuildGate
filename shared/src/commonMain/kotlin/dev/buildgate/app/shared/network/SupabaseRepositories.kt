@@ -278,6 +278,28 @@ class SupabaseAppListingRepository(
         return created
     }
 
+    override suspend fun updateListing(listing: AppListing): AppListing {
+        val numericId = listing.id.toLongOrNull()
+            ?: error("Cannot update listing without a valid numeric ID")
+        val updated = client.from("app_listings").update({
+            set("title", listing.title)
+            set("short_summary", listing.shortSummary)
+            set("play_store_opt_in_url", listing.playStoreOptInUrl)
+            set("google_group_url", listing.googleGroupUrl)
+            set("deep_link_scheme", listing.deepLinkScheme)
+            set("current_build_version", listing.currentBuildVersion)
+            set("min_version_code", listing.minVersionCode)
+            set("target_days", listing.targetDays)
+            set("target_testers", listing.targetTesters)
+            set("category", listing.category)
+        }) {
+            filter { eq("id", numericId) }
+            select()
+        }.decodeSingle<AppListing>()
+        refreshAll()
+        return updated
+    }
+
     override fun getMissionsForApp(appId: String): Flow<List<TestMission>> =
         missionsState.map { list -> list.filter { it.appId == appId } }
 
