@@ -297,6 +297,37 @@ class BuildGateCoreTest {
         }
     }
 
+    @Test
+    fun lenientJson_decodesPostgresBigintIdsIntoAppListingModel() {
+        val lenientJson = kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            coerceInputValues = true
+        }
+        val postgrestPayload = """
+            {
+              "id": 42,
+              "owner_id": "11111111-2222-3333-4444-555555555555",
+              "package_name": "com.mkdinteractive.shatterhorde",
+              "title": "Shatter Horde: Arena Survivor",
+              "short_summary": "Arena survivor",
+              "play_store_opt_in_url": "https://play.google.com/apps/testing/com.mkdinteractive.shatterhorde",
+              "google_group_url": "https://groups.google.com/g/mkd-interactive",
+              "deep_link_scheme": null,
+              "current_build_version": "1.6.0",
+              "min_version_code": 7,
+              "target_days": 14,
+              "target_testers": 16,
+              "category": "Action",
+              "is_active": true,
+              "created_at": "2026-11-26T06:00:00Z"
+            }
+        """.trimIndent()
+        val decoded = lenientJson.decodeFromString(AppListing.serializer(), postgrestPayload)
+        assertEquals("42", decoded.id)
+        assertEquals("com.mkdinteractive.shatterhorde", decoded.packageName)
+    }
+
     private fun sampleApp(id: String, pkg: String) = AppListing(
         id = id,
         ownerId = "owner_1",

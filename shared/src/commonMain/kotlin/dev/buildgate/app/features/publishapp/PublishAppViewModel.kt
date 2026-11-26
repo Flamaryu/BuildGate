@@ -291,7 +291,15 @@ class PublishAppViewModel(
                 )
             }.getOrElse { err ->
                 _uiState.update { it.copy(isSubmitting = false) }
-                _eventChannel.send(PublishAppEvent.ShowMessage(err.message ?: "Failed to publish campaign"))
+                val raw = err.message.orEmpty()
+                val friendly = when {
+                    raw.contains("23505") || raw.contains("app_listings_package_name_key") ->
+                        "This package ID ($pkg) is already published on BuildGate! Check the Discover tab."
+                    raw.contains("row-level security") || raw.contains("42501") ->
+                        "Please sign in on the Account tab before publishing an app."
+                    else -> raw.lineSequence().firstOrNull()?.take(140) ?: "Failed to publish campaign"
+                }
+                _eventChannel.send(PublishAppEvent.ShowMessage(friendly))
                 return@launch
             }
 
