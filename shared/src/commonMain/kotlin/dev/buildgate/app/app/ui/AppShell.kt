@@ -223,6 +223,10 @@ fun AppShell() {
 
             val movableNavHost = remember {
                 movableContentOf<Modifier> { contentModifier ->
+                    val liveAuthSession by authViewModel.sessionState.collectAsState()
+                    val liveUserId = liveAuthSession.user?.id ?: if (liveAuthSession.isDemoMode) "tester_1" else ""
+                    val liveUsername = liveAuthSession.profile?.username ?: "Tester"
+
                     NavHost(
                         navController = navController,
                         startDestination = BuildGateRoute.Discovery,
@@ -232,7 +236,7 @@ fun AppShell() {
                             DiscoveryPage(
                                 appListingRepository = appListingRepo,
                                 enrollmentRepository = enrollmentRepo,
-                                authSession = authSession,
+                                authSession = liveAuthSession,
                                 onOpenCampaign = { appIdOrPkg ->
                                     navigateTo(BuildGateRoute.AppCampaign(appIdOrPkg))
                                 },
@@ -252,7 +256,7 @@ fun AppShell() {
                             val route: BuildGateRoute.AppCampaign = backStackEntry.toRoute()
                             SessionVerificationPage(
                                 appId = route.appIdOrPackage,
-                                testerId = currentUserId,
+                                testerId = liveUserId,
                                 viewModel = verifySessionViewModel,
                                 onNavigateBack = { navigateTo(BuildGateRoute.Discovery) },
                                 onOpenTriageBoard = { resolvedAppId ->
@@ -268,9 +272,9 @@ fun AppShell() {
                                 triageViewModel = triageViewModel,
                                 submitViewModel = submitViewModel,
                                 missionsViewModel = missionsViewModel,
-                                testerId = currentUserId,
-                                testerUsername = currentUsername,
-                                isSignedIn = authSession.isLoggedIn,
+                                testerId = liveUserId,
+                                testerUsername = liveUsername,
+                                isSignedIn = liveAuthSession.isLoggedIn,
                                 onOpenProductionPacket = { targetAppId ->
                                     navigateTo(BuildGateRoute.ProductionPacket(targetAppId))
                                 },
@@ -288,7 +292,7 @@ fun AppShell() {
 
                         composable<BuildGateRoute.DailyQueue> {
                             DailyQueuePage(
-                                testerId = currentUserId,
+                                testerId = liveUserId,
                                 appListingRepository = appListingRepo,
                                 enrollmentRepository = enrollmentRepo,
                                 verifySessionViewModel = verifySessionViewModel,
@@ -303,9 +307,9 @@ fun AppShell() {
 
                         composable<BuildGateRoute.PublishApp> {
                             PublishAppPage(
-                                ownerId = currentUserId,
-                                ownerKarma = authSession.profile?.karmaPoints ?: 50,
-                                isSignedIn = authSession.isLoggedIn,
+                                ownerId = liveUserId,
+                                ownerKarma = liveAuthSession.profile?.karmaPoints ?: 50,
+                                isSignedIn = liveAuthSession.isLoggedIn,
                                 editAppId = null,
                                 viewModel = publishAppViewModel,
                                 onPublished = { publishedPkg ->
@@ -320,9 +324,9 @@ fun AppShell() {
                         composable<BuildGateRoute.EditApp> { backStackEntry ->
                             val route: BuildGateRoute.EditApp = backStackEntry.toRoute()
                             PublishAppPage(
-                                ownerId = currentUserId,
-                                ownerKarma = authSession.profile?.karmaPoints ?: 50,
-                                isSignedIn = authSession.isLoggedIn,
+                                ownerId = liveUserId,
+                                ownerKarma = liveAuthSession.profile?.karmaPoints ?: 50,
+                                isSignedIn = liveAuthSession.isLoggedIn,
                                 editAppId = route.appId,
                                 viewModel = publishAppViewModel,
                                 onPublished = { _ ->

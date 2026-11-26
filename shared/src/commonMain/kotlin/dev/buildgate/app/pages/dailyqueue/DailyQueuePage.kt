@@ -60,8 +60,10 @@ fun DailyQueuePage(
     onBrowseDiscovery: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val allListings by appListingRepository.getListings().collectAsState(initial = emptyList())
-    val enrollments by enrollmentRepository.getEnrollmentsForTester(testerId).collectAsState(initial = emptyList())
+    val allListings by remember(appListingRepository) { appListingRepository.getListings() }.collectAsState(initial = emptyList())
+    val enrollments by remember(enrollmentRepository, testerId) {
+        enrollmentRepository.getEnrollmentsForTester(testerId)
+    }.collectAsState(initial = emptyList())
     val sessionState by verifySessionViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coordinator: QaSessionCoordinator = koinInject()
