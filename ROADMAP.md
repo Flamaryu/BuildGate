@@ -1,9 +1,11 @@
 # BuildGate — Live Product Roadmap & Feature Tracker
 
+🚀 **[Open the Live Interactive GitHub Roadmap Board](https://github.com/users/Flamaryu/projects/3)** · 💡 **[Suggest a Feature or Report a Bug](https://github.com/Flamaryu/BuildGate/issues/new/choose)**
+
 > **How to use this live document:**
+> - Vote on features by adding a **👍 reaction** on the linked GitHub Issue (sorted in the **🔥 Most Requested** view on our public board).
 > - Move any feature row between status sections as it progresses (`Suggested` → `Considering` → `Planned` → `In Build` → `In Preview` → `Shipped` or `Rejected`).
-> - Update **Votes / Engagement** (e.g., GitHub 👍 reactions / Discord votes) and **Times Suggested** to prioritize what indie Android devs actually want most.
-> - When open-sourced on GitHub, link each feature ID to its GitHub Issue (e.g., `[#12](...)`) so community discussion and automated PR status updates stay synced.
+> - Update **Votes / Engagement** and **Times Suggested** to prioritize what indie Android devs actually want most.
 
 ---
 
