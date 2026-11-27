@@ -2,7 +2,9 @@ package dev.buildgate.app.pages.account
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -73,6 +75,8 @@ fun AccountPage(
     val usernameInput by viewModel.usernameInput.collectAsState()
     val passwordInput by viewModel.passwordInput.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
+    val displayNameStatus by viewModel.displayNameStatus.collectAsState()
+    val isCheckingDisplayName by viewModel.isCheckingDisplayName.collectAsState()
     val themeMode by BuildGateThemePreferences.themeMode.collectAsState()
     val remindersEnabled by DailyQueueReminderPreferences.enabled.collectAsState()
     val scope = rememberCoroutineScope()
@@ -518,11 +522,58 @@ fun AccountPage(
                                 OutlinedTextField(
                                     value = usernameInput,
                                     onValueChange = { viewModel.onUsernameChanged(it) },
-                                    label = { Text("Developer / Tester Handle") },
+                                    label = { Text("Display Name (Unique)") },
+                                    placeholder = { Text("e.g. MKD Interactive") },
                                     singleLine = true,
+                                    isError = displayNameStatus != null && !displayNameStatus!!.isAvailable,
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp)
                                 )
+
+                                if (isCheckingDisplayName) {
+                                    Text(
+                                        text = "⏳ Checking display name availability...",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    displayNameStatus?.let { status ->
+                                        if (status.isAvailable) {
+                                            Text(
+                                                text = "✅ \"${status.query}\" is available!",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        } else {
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(
+                                                    text = status.errorMessage
+                                                        ?: "❌ \"${status.query}\" is already taken — tap a free suggestion:",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                                if (status.suggestions.isNotEmpty()) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .horizontalScroll(rememberScrollState()),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        status.suggestions.forEach { suggestion ->
+                                                            FilterChip(
+                                                                selected = false,
+                                                                onClick = { viewModel.selectSuggestedDisplayName(suggestion) },
+                                                                label = { Text("✨ $suggestion") }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             OutlinedTextField(
@@ -544,12 +595,15 @@ fun AccountPage(
                                 shape = RoundedCornerShape(12.dp)
                             )
 
+                            val canSubmitCreate = !isCreateAccountMode ||
+                                (!isCheckingDisplayName && usernameInput.trim().length >= 2 && (displayNameStatus?.isAvailable != false))
+
                             Button(
                                 onClick = {
                                     if (isCreateAccountMode) viewModel.signUpWithEmail()
                                     else viewModel.signInWithEmail()
                                 },
-                                enabled = !isBusy,
+                                enabled = !isBusy && canSubmitCreate,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp)
                             ) {

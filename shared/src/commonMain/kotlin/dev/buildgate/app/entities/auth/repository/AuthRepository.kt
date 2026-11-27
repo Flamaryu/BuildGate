@@ -13,9 +13,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
+data class DisplayNameAvailability(
+    val query: String,
+    val isAvailable: Boolean,
+    val suggestions: List<String> = emptyList(),
+    val errorMessage: String? = null
+)
+
 interface AuthRepository {
     fun getAuthSession(): Flow<AuthSession>
     fun getKarmaLedger(userId: String): Flow<List<KarmaEntry>>
+    suspend fun checkDisplayNameAvailability(displayName: String): DisplayNameAvailability
     suspend fun signInWithGoogle(): Result<AuthSession>
     suspend fun signInWithEmail(email: String, pass: String): Result<AuthSession>
     suspend fun signUpWithEmail(email: String, pass: String, username: String): Result<AuthSession>
@@ -66,6 +74,23 @@ class DemoAuthRepository : AuthRepository {
 
     override fun getKarmaLedger(userId: String): Flow<List<KarmaEntry>> =
         ledgerState.map { list -> list.filter { it.userId == userId } }
+
+    override suspend fun checkDisplayNameAvailability(displayName: String): DisplayNameAvailability {
+        val clean = displayName.trim()
+        if (clean.length < 2) {
+            return DisplayNameAvailability(clean, isAvailable = false, errorMessage = "Display name must be at least 2 characters.")
+        }
+        val taken = profilesById.value.values.any { it.username.trim().equals(clean, ignoreCase = true) }
+        if (!taken) {
+            return DisplayNameAvailability(clean, isAvailable = true)
+        }
+        val base = clean.take(30)
+        val candidates = listOf("${base}Dev", "${base}QA", "${base}Hub", "${base}_26", "${base}2026", "${base}_Pro")
+        val free = candidates.filter { cand ->
+            profilesById.value.values.none { it.username.trim().equals(cand, ignoreCase = true) }
+        }.take(3)
+        return DisplayNameAvailability(clean, isAvailable = false, suggestions = free)
+    }
 
     override suspend fun signInWithGoogle(): Result<AuthSession> {
         val profile = profilesById.value["tester_1"] ?: defaultProfile

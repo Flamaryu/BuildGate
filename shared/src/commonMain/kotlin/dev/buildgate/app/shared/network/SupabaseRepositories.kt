@@ -6,6 +6,7 @@ import dev.buildgate.app.entities.applisting.repository.AppListingRepository
 import dev.buildgate.app.entities.auth.model.AuthSession
 import dev.buildgate.app.entities.auth.model.AuthUser
 import dev.buildgate.app.entities.auth.repository.AuthRepository
+import dev.buildgate.app.entities.auth.repository.DisplayNameAvailability
 import dev.buildgate.app.entities.dailyverification.model.DailyVerification
 import dev.buildgate.app.entities.dailyverification.model.VerificationMethod
 import dev.buildgate.app.entities.enrollment.domain.VerificationOutcome
@@ -158,6 +159,32 @@ class SupabaseAuthRepository(
 
     override fun getKarmaLedger(userId: String): Flow<List<KarmaEntry>> =
         ledgerCache.map { list -> list.filter { it.userId == userId } }
+
+    override suspend fun checkDisplayNameAvailability(displayName: String): DisplayNameAvailability {
+        val clean = displayName.trim()
+        if (clean.length < 2) {
+            return DisplayNameAvailability(clean, isAvailable = false, errorMessage = "Display name must be at least 2 characters.")
+        }
+        return runCatching {
+            val json = client.postgrest.rpc(
+                "check_display_name_availability",
+                buildJsonObject { put("p_display_name", clean) }
+            ).decodeAs<JsonObject>()
+            val available = json["available"]?.jsonPrimitive?.booleanOrNull ?: false
+            val err = json["error"]?.jsonPrimitive?.content
+            val suggestions = (json["suggestions"] as? kotlinx.serialization.json.JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.content.takeIf { s -> s.isNotBlank() } }
+                ?: emptyList()
+            DisplayNameAvailability(
+                query = clean,
+                isAvailable = available,
+                suggestions = suggestions,
+                errorMessage = err
+            )
+        }.getOrElse {
+            DisplayNameAvailability(clean, isAvailable = true)
+        }
+    }
 
     override suspend fun signInWithGoogle(): Result<AuthSession> = runCatching {
         client.auth.signInWith(Google)
