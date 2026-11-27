@@ -66,7 +66,7 @@ object DeepLinkRouter {
     }
 
     fun buildShareableCampaignUrl(packageName: String): String =
-        "https://buildgate.dev/app/$packageName"
+        "https://buildgatehub.com/app/$packageName"
 
     fun buildAndroidDeepLinkUrl(packageName: String): String =
         "buildgate://app/$packageName"
@@ -91,8 +91,8 @@ object DeepLinkRouter {
         }
 
         val normalized = trimmed
-            .removePrefix("https://buildgate.dev")
-            .removePrefix("http://buildgate.dev")
+            .removePrefix("https://buildgatehub.com")
+            .removePrefix("http://buildgatehub.com")
             .removePrefix("buildgate://")
             .let { if (it.contains("#")) it.substringAfter("#") else it }
             .trimStart('/')

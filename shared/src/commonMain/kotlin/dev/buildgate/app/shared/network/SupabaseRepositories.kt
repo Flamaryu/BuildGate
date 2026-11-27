@@ -32,6 +32,15 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -603,6 +612,42 @@ class SupabaseFeedbackRepository(
         return feedbackState.map { list -> list.filter { it.appId == appId } }
     }
 
+    private suspend fun uploadMediaToR2OrSupabase(
+        appId: String,
+        authorId: String,
+        bytes: ByteArray,
+        fileName: String,
+        mimeType: String
+    ): String {
+        val accessToken = client.auth.currentAccessTokenOrNull()
+        if (!accessToken.isNullOrBlank()) {
+            val r2Url = runCatching {
+                val http = createBuildGateHttpClient(SupabaseConfig("", ""))
+                try {
+                    val response = http.post("https://buildgatehub.com/api/media/upload") {
+                        parameter("appId", appId)
+                        parameter("fileName", fileName)
+                        header("Authorization", "Bearer $accessToken")
+                        contentType(ContentType.parse(mimeType))
+                        setBody(bytes)
+                    }
+                    if (response.status.isSuccess()) {
+                        response.body<JsonObject>()["url"]?.jsonPrimitive?.content
+                    } else null
+                } finally {
+                    http.close()
+                }
+            }.getOrNull()
+            if (!r2Url.isNullOrBlank()) return r2Url
+        }
+
+        // Seamless fallback to Supabase Storage until Cloudflare R2 bucket is enabled
+        val bucket = client.storage.from("feedback-media")
+        val path = "$authorId/$appId/${BuildGateClock.nowEpochMs()}_$fileName"
+        bucket.upload(path, bytes) { upsert = true }
+        return bucket.publicUrl(path)
+    }
+
     override suspend fun submitFeedback(
         appId: String,
         authorId: String,
@@ -620,19 +665,16 @@ class SupabaseFeedbackRepository(
         mediaDurationMs: Int?,
         localPreviewUri: String?
     ): FeedbackItem {
-        val bucket = client.storage.from("feedback-media")
-        val ts = BuildGateClock.nowEpochMs()
-
         val uploadedScreenshotUrl = if (screenshotBytes != null) {
-            val path = "$authorId/$appId/${ts}_${screenshotFileName ?: "screenshot.webp"}"
-            bucket.upload(path, screenshotBytes) { upsert = true }
-            bucket.publicUrl(path)
+            val name = screenshotFileName ?: "screenshot.webp"
+            val mime = if (name.endsWith(".png", ignoreCase = true)) "image/png" else "image/webp"
+            uploadMediaToR2OrSupabase(appId, authorId, screenshotBytes, name, mime)
         } else null
 
         val uploadedVideoUrl = if (videoClipBytes != null) {
-            val path = "$authorId/$appId/${ts}_${videoFileName ?: "clip.mp4"}"
-            bucket.upload(path, videoClipBytes) { upsert = true }
-            bucket.publicUrl(path)
+            val name = videoFileName ?: "clip.mp4"
+            val mime = if (name.endsWith(".webm", ignoreCase = true)) "video/webm" else "video/mp4"
+            uploadMediaToR2OrSupabase(appId, authorId, videoClipBytes, name, mime)
         } else null
 
         val created = client.from("feedback_items").insert(

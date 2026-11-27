@@ -1,0 +1,16 @@
+{
+  "name": "buildgate-hub-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:web": "cd .. && ./gradlew :webApp:wasmJsBrowserDistribution",
+    "dev": "npx wrangler dev",
+    "deploy": "npx wrangler deploy",
+    "r2:create": "npx wrangler r2 bucket create buildgate-media"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260401.0",
+    "typescript": "^5.8.0"
+  }
+}

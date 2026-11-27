@@ -150,7 +150,7 @@ class BuildGateCoreTest {
 
     @Test
     fun deepLinkRouter_parsesAppLinks_customSchemeCallbacks_webHashes_andAuthCodes() {
-        val campaignLink = DeepLinkRouter.parseUri("https://buildgate.dev/app/io.focuspulse.habittracker")
+        val campaignLink = DeepLinkRouter.parseUri("https://buildgatehub.com/app/io.focuspulse.habittracker")
         assertEquals(
             IncomingDeepLink.Navigate(BuildGateRoute.AppCampaign("io.focuspulse.habittracker")),
             campaignLink
