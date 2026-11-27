@@ -93,6 +93,7 @@ fun AccountPage(
     }
     var isCreateAccountMode by remember { mutableStateOf(false) }
     var showKarmaSheet by remember { mutableStateOf(false) }
+    var showUsageDisclosure by remember { mutableStateOf(false) }
     var deleteDialogStep by remember { mutableStateOf(0) } // 0 = closed, 1 = warning, 2 = type DELETE
     var deleteConfirmInput by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -101,6 +102,37 @@ fun AccountPage(
         KarmaExplainerSheet(
             currentKarma = session.profile?.karmaPoints ?: 50,
             onDismiss = { showKarmaSheet = false }
+        )
+    }
+
+    if (showUsageDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showUsageDisclosure = false },
+            title = { Text("🛡️ Usage Access Disclosure", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "BuildGate optionally uses Android Usage Access (PACKAGE_USAGE_STATS) ONLY while an active 60-second QA timer is running to confirm the tested app stays in the foreground.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "BuildGate never reads messages, browsing history, or uploads unrelated apps. You can turn it off anytime from here or Android Settings.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUsageDisclosure = false
+                        platformVerifier.requestUsageStatsPermission()
+                    }
+                ) { Text("Continue to Settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUsageDisclosure = false }) { Text("Not Now") }
+            }
         )
     }
 
@@ -658,6 +690,57 @@ fun AccountPage(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text("Open Privacy Policy (buildgatehub.com/privacy) ↗")
+                        }
+
+                        if (platformVerifier.supportsDeviceVerification) {
+                            HorizontalDivider()
+                            val usageGranted = platformVerifier.hasUsageStatsPermission()
+                            val overlayGranted = platformVerifier.canDrawOverlays()
+                            Text(
+                                text = "🛡️ Optional QA Permissions",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Both permissions are optional. Without Usage Access, timers use background elapsed time; without Floating Overlay, BuildGate uses a notification-shade fallback.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (usageGranted) "Usage Access: Active" else "Usage Access: Off",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (usageGranted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                TextButton(
+                                    onClick = {
+                                        if (usageGranted) platformVerifier.requestUsageStatsPermission()
+                                        else showUsageDisclosure = true
+                                    }
+                                ) {
+                                    Text(if (usageGranted) "Turn Off / Manage" else "Enable")
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (overlayGranted) "Floating QA Overlay: Active" else "Floating QA Overlay: Off",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (overlayGranted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                TextButton(onClick = { platformVerifier.requestOverlayPermission() }) {
+                                    Text(if (overlayGranted) "Turn Off / Manage" else "Enable")
+                                }
+                            }
                         }
 
                         if (session.isLoggedIn) {

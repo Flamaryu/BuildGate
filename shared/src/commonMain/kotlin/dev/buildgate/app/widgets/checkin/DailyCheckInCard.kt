@@ -282,6 +282,10 @@ fun DailyCheckInCard(
                     TextButton(onClick = { showUsageDisclosure = true }) {
                         Text("Enable")
                     }
+                } else {
+                    TextButton(onClick = onEnableUsageAccessClick) {
+                        Text("Manage / Off")
+                    }
                 }
             }
 
