@@ -1,6 +1,6 @@
 # BuildGate — Live Product Roadmap & Feature Tracker
 
-🚀 **[Open the Live Interactive GitHub Roadmap Board](https://github.com/users/Flamaryu/projects/3)** · 💡 **[Suggest a Feature or Report a Bug](https://github.com/Flamaryu/BuildGate/issues/new/choose)**
+🚀 **[Open the Live Interactive GitHub Roadmap Board](https://github.com/users/Flamaryu/projects/3)** · 💡 **[Suggest a Feature or Report a Bug](https://github.com/Flamaryu/BuildGate/issues/new/choose)** · ☕ **[Support on Ko-fi](https://ko-fi.com/flamaryu)**
 
 > **How to use this live document:**
 > - Vote on features by adding a **👍 reaction** on the linked GitHub Issue (sorted in the **🔥 Most Requested** view on our public board).

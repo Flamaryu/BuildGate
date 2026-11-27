@@ -426,6 +426,9 @@ fun AppShell() {
                             onCycleTheme = { BuildGateThemePreferences.cycleThemeMode() },
                             onOpenKarmaInfo = { showKarmaSheet = true },
                             onOpenPrivacyPolicy = { platformVerifier.openExternalUrl("https://buildgatehub.com/privacy") },
+                            onOpenSupportTip = if (!platformVerifier.supportsDeviceVerification) {
+                                { platformVerifier.openExternalUrl("https://ko-fi.com/flamaryu") }
+                            } else null,
                             onTabSelected = { onTabSelected(it) }
                         )
                         VerticalDivider(
@@ -479,6 +482,7 @@ private fun DesktopBrandSidebar(
     onCycleTheme: () -> Unit,
     onOpenKarmaInfo: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
+    onOpenSupportTip: (() -> Unit)? = null,
     onTabSelected: (TopLevelTab) -> Unit
 ) {
     val sidebarWidth by animateDpAsState(targetValue = if (isCollapsed) 74.dp else 224.dp)
@@ -649,6 +653,18 @@ private fun DesktopBrandSidebar(
                     ) {
                         Text(text = "🔒", style = MaterialTheme.typography.bodyMedium)
                     }
+                    if (onOpenSupportTip != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(onClick = onOpenSupportTip)
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "☕", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 } else {
                     Row(
                         modifier = Modifier
@@ -743,6 +759,28 @@ private fun DesktopBrandSidebar(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                    if (onOpenSupportTip != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(onClick = onOpenSupportTip)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "☕ Support / Ko-fi",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "↗",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
