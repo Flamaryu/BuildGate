@@ -55,6 +55,13 @@ data class ActiveQaSessionState(
 
     val activeAppMissions: List<TestMission>
         get() = activeApp?.let { missionsByAppId[it.id] }.orEmpty()
+
+    val pendingRequiredMissionsCount: Int
+        get() = activeAppMissions.count { it.isRequired && !it.isCompleted }
+
+    val isFullyReadyToVerify: Boolean
+        get() = (phase == QaSessionPhase.READY_TO_VERIFY || phase == QaSessionPhase.VERIFIED) &&
+            pendingRequiredMissionsCount == 0
 }
 
 interface QaOverlayController {

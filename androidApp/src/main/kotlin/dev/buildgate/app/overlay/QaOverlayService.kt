@@ -1,6 +1,7 @@
 package dev.buildgate.app.overlay
 
 import android.app.Notification
+import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -551,7 +552,24 @@ class QaOverlayService : Service() {
 
                 val isReadyForNext = (snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED)
                 val nextQueued = snap.nextQueuedApp
-                if (isReadyForNext && nextQueued != null) {
+                if (isReadyForNext && snap.pendingRequiredMissionsCount > 0) {
+                    val reqCount = snap.pendingRequiredMissionsCount
+                    val reqBtn = Button(this).apply {
+                        text = "🎯 Complete $reqCount Required Mission(s) First"
+                        isAllCaps = false
+                        setTextColor(Color.WHITE)
+                        typeface = Typeface.DEFAULT_BOLD
+                        textSize = 12.5f
+                        background = roundedBg(Color.parseColor("#B45309"), Color.parseColor("#FBBF24"), 12)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = dp(8) }
+                        setOnClickListener { switchOverlayMode(OverlayMode.MISSIONS_CHECKLIST) }
+                    }
+                    card.addView(reqBtn)
+                } else if (isReadyForNext && nextQueued != null) {
                     val nextBtn = Button(this).apply {
                         text = "✅ Verify & Launch Next: ${nextQueued.title.substringBefore(":")} ➔"
                         isAllCaps = false
@@ -686,7 +704,8 @@ class QaOverlayService : Service() {
                         }
 
                         val titleTv = TextView(this).apply {
-                            text = (if (mission.isCompleted) "✅ " else "○ ") + mission.title
+                            val reqTag = if (mission.isRequired) " [REQUIRED]" else ""
+                            text = (if (mission.isCompleted) "✅ " else "○ ") + mission.title + reqTag
                             setTextColor(Color.WHITE)
                             typeface = Typeface.DEFAULT_BOLD
                             textSize = 12f
@@ -951,6 +970,8 @@ class QaOverlayService : Service() {
 
     private fun pillColorsFor(snap: ActiveQaSessionState): Pair<Int, Int> = when {
         isRecordingClip -> Color.parseColor("#B91C1C") to Color.parseColor("#FCA5A5")
+        (snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED) && snap.pendingRequiredMissionsCount > 0 ->
+            Color.parseColor("#92400E") to Color.parseColor("#FBBF24")
         snap.phase == QaSessionPhase.READY_TO_VERIFY || snap.phase == QaSessionPhase.VERIFIED ->
             Color.parseColor("#065F46") to Color.parseColor("#34D399")
         snap.phase == QaSessionPhase.PAUSED_TARGET_BACKGROUNDED ->
@@ -965,6 +986,15 @@ class QaOverlayService : Service() {
     private fun launchNextQueuedAppDirectly(verifyCurrent: Boolean) {
         val snap = GlobalQaSession.coordinator.state.value
         val currentApp = snap.activeApp
+        if (verifyCurrent && snap.pendingRequiredMissionsCount > 0) {
+            android.widget.Toast.makeText(
+                this,
+                "Complete ${snap.pendingRequiredMissionsCount} required QA mission(s) first!",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            switchOverlayMode(OverlayMode.MISSIONS_CHECKLIST)
+            return
+        }
         if (verifyCurrent && currentApp != null) {
             val verifier = getPlatformVerifier()
             val pkgInfo = verifier.inspectInstalledApp(currentApp.packageName)
@@ -999,7 +1029,8 @@ class QaOverlayService : Service() {
             }
         } else {
             openBuildGateQueueScreen()
-            dismissOverlayCompletely()
+            // Keep overlay/FGS alive briefly so Android 14-17 BAL allows MainActivity to come to foreground
+            mainHandler.postDelayed({ dismissOverlayCompletely() }, 350L)
         }
     }
 
@@ -1021,8 +1052,13 @@ class QaOverlayService : Service() {
             QaSessionPhase.PAUSED_FOR_FEEDBACK -> "⏸️ Paused • $shortTitle"
             QaSessionPhase.PAUSED_TARGET_BACKGROUNDED -> "⏸️ Open $shortTitle • ${rem}s"
             QaSessionPhase.READY_TO_VERIFY, QaSessionPhase.VERIFIED -> {
+                val reqLeft = snap.pendingRequiredMissionsCount
                 val nextShort = snap.nextQueuedApp?.title?.substringBefore(":")
-                if (nextShort != null) "✅ Done • Next: $nextShort ➔" else "✅ $shortTitle Verified!"
+                when {
+                    reqLeft > 0 -> "🎯 $reqLeft Req Mission • Tap"
+                    nextShort != null -> "✅ Done • Next: $nextShort ➔"
+                    else -> "✅ $shortTitle Verified!"
+                }
             }
             QaSessionPhase.RUNNING_IN_TARGET_APP -> "⚡ ${rem}s • $shortTitle"
             QaSessionPhase.IDLE -> "⚡ BuildGate QA"
@@ -1140,19 +1176,46 @@ class QaOverlayService : Service() {
     }
 
     private fun openBuildGateTriageScreen(appId: String) {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            data = Uri.parse("buildgate://triage/$appId")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        startActivity(intent)
+        launchBuildGateActivity(Uri.parse("buildgate://triage/$appId"))
     }
 
     private fun openBuildGateQueueScreen() {
+        launchBuildGateActivity(Uri.parse("buildgate://queue"))
+    }
+
+    private fun launchBuildGateActivity(deepLinkUri: Uri) {
         val intent = Intent(this, MainActivity::class.java).apply {
-            data = Uri.parse("buildgate://queue")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            action = Intent.ACTION_VIEW
+            data = deepLinkUri
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            )
         }
-        startActivity(intent)
+        val launchedViaPending = runCatching {
+            val pi = PendingIntent.getActivity(
+                this,
+                (deepLinkUri.toString().hashCode() and 0x7fff),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val opts = ActivityOptions.makeBasic()
+                    .setPendingIntentBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    )
+                pi.send(this, 0, null, null, null, null, opts.toBundle())
+            } else {
+                pi.send()
+            }
+            true
+        }.getOrDefault(false)
+
+        if (!launchedViaPending) {
+            runCatching { startActivity(intent) }
+        }
     }
 
     private fun ensureNotificationChannel() {
