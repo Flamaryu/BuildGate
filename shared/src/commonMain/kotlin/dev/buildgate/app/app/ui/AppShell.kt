@@ -129,23 +129,27 @@ fun AppShell() {
             // Persist inline bug reports submitted directly inside the Floating QA Overlay
             LaunchedEffect(currentUserId, currentUsername) {
                 QaMediaCaptureBus.overlaySubmissions.collect { sub ->
-                    feedbackRepo.submitFeedback(
-                        appId = sub.appId,
-                        authorId = currentUserId,
-                        authorUsername = currentUsername,
-                        sessionId = sub.sessionToken,
-                        buildVersion = sub.buildVersion,
-                        category = sub.category,
-                        title = sub.title,
-                        description = sub.description,
-                        deviceMetadata = sub.deviceMetadata,
-                        screenshotBytes = sub.screenshotBytes,
-                        screenshotFileName = sub.screenshotFileName,
-                        videoClipBytes = sub.videoClipBytes,
-                        videoFileName = sub.videoFileName,
-                        mediaDurationMs = sub.mediaDurationMs,
-                        localPreviewUri = sub.localPreviewUri
-                    )
+                    runCatching {
+                        feedbackRepo.submitFeedback(
+                            appId = sub.appId,
+                            authorId = currentUserId,
+                            authorUsername = currentUsername,
+                            sessionId = sub.sessionToken,
+                            buildVersion = sub.buildVersion,
+                            category = sub.category,
+                            title = sub.title,
+                            description = sub.description,
+                            deviceMetadata = sub.deviceMetadata,
+                            screenshotBytes = sub.screenshotBytes,
+                            screenshotFileName = sub.screenshotFileName,
+                            videoClipBytes = sub.videoClipBytes,
+                            videoFileName = sub.videoFileName,
+                            mediaDurationMs = sub.mediaDurationMs,
+                            localPreviewUri = sub.localPreviewUri
+                        )
+                    }.onFailure { err ->
+                        println("BuildGate overlay feedback submit failed: ${err.message}")
+                    }
                 }
             }
 

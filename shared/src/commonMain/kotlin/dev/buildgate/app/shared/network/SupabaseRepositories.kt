@@ -34,12 +34,13 @@ import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.contentType
+import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -618,34 +619,51 @@ class SupabaseFeedbackRepository(
         bytes: ByteArray,
         fileName: String,
         mimeType: String
-    ): String {
+    ): String? {
         val accessToken = client.auth.currentAccessTokenOrNull()
         if (!accessToken.isNullOrBlank()) {
             val r2Url = runCatching {
-                val http = createBuildGateHttpClient(SupabaseConfig("", ""))
+                val http = HttpClient {
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = 60_000L
+                        connectTimeoutMillis = 15_000L
+                        socketTimeoutMillis = 60_000L
+                    }
+                }
                 try {
                     val response = http.post("https://buildgatehub.com/api/media/upload") {
                         parameter("appId", appId)
                         parameter("fileName", fileName)
                         header("Authorization", "Bearer $accessToken")
-                        contentType(ContentType.parse(mimeType))
-                        setBody(bytes)
+                        setBody(ByteArrayContent(bytes, ContentType.parse(mimeType)))
                     }
                     if (response.status.isSuccess()) {
-                        response.body<JsonObject>()["url"]?.jsonPrimitive?.content
-                    } else null
+                        val rawJson = response.body<String>()
+                        kotlinx.serialization.json.Json.parseToJsonElement(rawJson)
+                            .let { it as? JsonObject }
+                            ?.get("url")?.jsonPrimitive?.content
+                    } else {
+                        println("BuildGate R2 upload failed: HTTP ${response.status.value} ${runCatching { response.body<String>() }.getOrDefault("")}")
+                        null
+                    }
                 } finally {
                     http.close()
                 }
+            }.onFailure { err ->
+                println("BuildGate R2 upload exception: ${err.message}")
             }.getOrNull()
             if (!r2Url.isNullOrBlank()) return r2Url
         }
 
-        // Seamless fallback to Supabase Storage until Cloudflare R2 bucket is enabled
-        val bucket = client.storage.from("feedback-media")
-        val path = "$authorId/$appId/${BuildGateClock.nowEpochMs()}_$fileName"
-        bucket.upload(path, bytes) { upsert = true }
-        return bucket.publicUrl(path)
+        // Seamless fallback to Supabase Storage (non-fatal so the bug report itself still saves!)
+        return runCatching {
+            val bucket = client.storage.from("feedback-media")
+            val path = "$authorId/$appId/${BuildGateClock.nowEpochMs()}_$fileName"
+            bucket.upload(path, bytes) { upsert = true }
+            bucket.publicUrl(path)
+        }.onFailure { err ->
+            println("BuildGate Supabase Storage fallback failed: ${err.message}")
+        }.getOrNull()
     }
 
     override suspend fun submitFeedback(
