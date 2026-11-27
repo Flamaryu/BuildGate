@@ -128,6 +128,7 @@ class QaOverlayService : Service() {
     private var pendingPreviewPath: String? = null
     private var prefilledBugTitle: String = ""
     private var prefilledBugDesc: String = ""
+    private var selectedFeedbackCategory: FeedbackCategory = FeedbackCategory.BUG
 
     private val tickerRunnable = object : Runnable {
         override fun run() {
@@ -638,8 +639,8 @@ class QaOverlayService : Service() {
                     if (mediaProjection == null) requestMediaProjectionConsent(ACTION_RECORD_CLIP_15S)
                     else startScreenClip15s()
                 })
-                card.addView(menuButton("🐛 Quick Bug Note (Pause Queue)") {
-                    GlobalQaSession.coordinator.pauseForFeedback("Quick Bug Note")
+                card.addView(menuButton("📝 Log Feedback / Bug (Pause)") {
+                    GlobalQaSession.coordinator.pauseForFeedback("Quick QA Feedback")
                     switchOverlayMode(OverlayMode.INLINE_BUG_SHEET)
                 })
                 if (!isReadyForNext && nextQueued != null) {
@@ -772,6 +773,7 @@ class QaOverlayService : Service() {
                             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                             setOnClickListener {
                                 GlobalQaSession.coordinator.pauseForFeedback("Failed Mission: ${mission.title}")
+                                selectedFeedbackCategory = FeedbackCategory.BUG
                                 prefilledBugTitle = "[Mission Failed] ${mission.title}"
                                 prefilledBugDesc = "Mission: ${mission.instructions}\n\nWhat went wrong: "
                                 switchOverlayMode(OverlayMode.INLINE_BUG_SHEET)
@@ -803,7 +805,7 @@ class QaOverlayService : Service() {
 
                 val specs = getPlatformVerifier().captureDeviceMetadata()
                 val titleHeader = TextView(this).apply {
-                    text = "⏸️ Session Paused • Log Bug for $appTitle"
+                    text = "⏸️ Session Paused • Log Feedback for $appTitle"
                     setTextColor(Color.parseColor("#FCD34D"))
                     typeface = Typeface.DEFAULT_BOLD
                     textSize = 13f
@@ -824,7 +826,7 @@ class QaOverlayService : Service() {
                 sheet.addView(subHeader)
 
                 val titleInput = EditText(this).apply {
-                    hint = "Bug / Friction Title"
+                    hint = "Bug / Friction / Idea Title"
                     if (prefilledBugTitle.isNotBlank()) setText(prefilledBugTitle)
                     setHintTextColor(Color.parseColor("#94A3B8"))
                     setTextColor(Color.WHITE)
@@ -832,7 +834,6 @@ class QaOverlayService : Service() {
                     setPadding(dp(10), dp(8), dp(10), dp(8))
                     minWidth = dp(250)
                 }
-                sheet.addView(titleInput)
 
                 val descInput = EditText(this).apply {
                     hint = "What happened?"
@@ -843,6 +844,58 @@ class QaOverlayService : Service() {
                     setPadding(dp(10), dp(8), dp(10), dp(8))
                     minLines = 2
                 }
+
+                // Compact 3-chip category picker (Bug / UX / Idea)
+                val catRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = dp(8) }
+                }
+                val categoryOptions = listOf(
+                    Triple(FeedbackCategory.BUG, "🐞 Bug", "What broke or crashed?"),
+                    Triple(FeedbackCategory.UX_FRICTION, "🎨 UX", "What felt confusing or clunky?"),
+                    Triple(FeedbackCategory.IDEA, "💡 Idea", "Describe your feature suggestion...")
+                )
+                val catButtons = mutableListOf<Pair<FeedbackCategory, Button>>()
+
+                fun refreshCategoryPills() {
+                    catButtons.forEach { (cat, btn) ->
+                        val isSelected = cat == selectedFeedbackCategory
+                        btn.background = roundedBg(
+                            fillColor = if (isSelected) Color.parseColor("#4F46E5") else Color.parseColor("#27273A"),
+                            strokeColor = if (isSelected) Color.parseColor("#A5B4FC") else Color.parseColor("#475569"),
+                            radiusDp = 10
+                        )
+                        btn.setTextColor(if (isSelected) Color.WHITE else Color.parseColor("#CBD5E1"))
+                    }
+                    val activeHint = categoryOptions.firstOrNull { it.first == selectedFeedbackCategory }?.third
+                    if (activeHint != null) descInput.hint = activeHint
+                }
+
+                categoryOptions.forEachIndexed { idx, (cat, label, _) ->
+                    val chipBtn = Button(this).apply {
+                        text = label
+                        isAllCaps = false
+                        textSize = 11.5f
+                        typeface = Typeface.DEFAULT_BOLD
+                        setPadding(dp(6), dp(5), dp(6), dp(5))
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (idx < categoryOptions.lastIndex) marginEnd = dp(6)
+                        }
+                        setOnClickListener {
+                            selectedFeedbackCategory = cat
+                            refreshCategoryPills()
+                        }
+                    }
+                    catButtons.add(cat to chipBtn)
+                    catRow.addView(chipBtn)
+                }
+                refreshCategoryPills()
+                sheet.addView(catRow)
+                sheet.addView(titleInput)
+
                 val descLp = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -859,6 +912,7 @@ class QaOverlayService : Service() {
                     setOnClickListener {
                         prefilledBugTitle = ""
                         prefilledBugDesc = ""
+                        selectedFeedbackCategory = FeedbackCategory.BUG
                         clearPendingAttachments()
                         GlobalQaSession.coordinator.resumeFromFeedback()
                         switchOverlayMode(OverlayMode.COLLAPSED_PILL)
@@ -869,8 +923,14 @@ class QaOverlayService : Service() {
                     isAllCaps = false
                     setOnClickListener {
                         val activeApp = snap.activeApp
+                        val chosenCategory = selectedFeedbackCategory
+                        val defaultTitlePrefix = when (chosenCategory) {
+                            FeedbackCategory.BUG -> "In-App QA Bug"
+                            FeedbackCategory.UX_FRICTION -> "UX Friction Note"
+                            FeedbackCategory.IDEA -> "Feature Suggestion"
+                        }
                         val issueTitle = titleInput.text?.toString()?.trim().orEmpty()
-                            .ifBlank { "In-App QA Issue on $appTitle" }
+                            .ifBlank { "$defaultTitlePrefix on $appTitle" }
                         val issueDesc = descInput.text?.toString()?.trim().orEmpty()
                             .ifBlank { "Captured directly via BuildGate Floating QA Overlay." }
 
@@ -880,7 +940,7 @@ class QaOverlayService : Service() {
                                     appId = activeApp.id,
                                     sessionToken = snap.sessionToken,
                                     buildVersion = activeApp.currentBuildVersion,
-                                    category = FeedbackCategory.BUG,
+                                    category = chosenCategory,
                                     title = issueTitle,
                                     description = issueDesc,
                                     deviceMetadata = specs,
@@ -895,6 +955,7 @@ class QaOverlayService : Service() {
                         }
                         prefilledBugTitle = ""
                         prefilledBugDesc = ""
+                        selectedFeedbackCategory = FeedbackCategory.BUG
                         clearPendingAttachments()
                         GlobalQaSession.coordinator.resumeFromFeedback()
                         switchOverlayMode(OverlayMode.COLLAPSED_PILL)
