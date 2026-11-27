@@ -51,13 +51,13 @@ fun KarmaExplainerSheet(
             // Header
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "⚡ How BuildGate Karma Works",
+                    text = "⚡ BuildGate Karma Economy",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Test other indie apps to earn Karma — your Karma automatically boosts your own published apps higher in the Discover feed so you reach Google Play's 12-tester requirement faster.",
+                    text = "Earn Karma by testing other indie apps, then use it to passively boost your Discover rank or spend it on high-impact campaign boosts.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -70,35 +70,29 @@ fun KarmaExplainerSheet(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = "YOUR DISCOVER RANKING BOOST",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "⚡ $currentKarma Karma  ➔  +$rankingBoost pts",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "Formula: (Owner Karma × 2) + (Active Testers × 5)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
-                    }
+                    Text(
+                        text = "YOUR PASSIVE DISCOVER RANKING BOOST",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "⚡ $currentKarma Karma  ➔  +$rankingBoost pts",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Formula: (Owner Karma × 2) + (Active Testers × 5) + Featured (+500)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
                 }
             }
 
@@ -112,33 +106,60 @@ fun KarmaExplainerSheet(
                 )
                 KarmaRuleRow("🎉", "Create Account", "Starter credit on sign-up", "+50⚡")
                 KarmaRuleRow("⏱️", "Daily 60s Check-In", "Once per UTC day per enrolled app", "+10⚡")
-                KarmaRuleRow("🔗", "Deep-Link Handshake", "Extra bonus on apps with Deep-Link enabled", "+5⚡")
-                KarmaRuleRow("🐞", "Accepted Bug Bounty", "When an app owner triages your bug report", "+25⚡")
+                KarmaRuleRow("🔗", "Deep-Link Handshake", "Bonus on apps with Deep-Link enabled", "+5⚡")
+                KarmaRuleRow("🐞", "Accepted Bug Bounty", "Triaged bug (+50⚡ if 2× Bounty Pool active)", "+25⚡")
                 KarmaRuleRow("🏁", "Day-14 Completion", "Finish all 14 verified days for an app", "+100⚡")
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 
-            // Fair-Play & Streak Rules
+            // Optional Spend Boosts
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Optional Karma Boosts (Publishing is Always Free)",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                KarmaRuleRow("📲", "New Build Re-Test Ping", "24h alert to testers (+5⚡ Early Upgrader bonus)", "-30⚡", isSpend = true)
+                KarmaRuleRow("🛡️", "Extra Streak Grace Shield", "Buy +1 extra grace day (up to 3 per campaign)", "-40⚡", isSpend = true)
+                KarmaRuleRow("🎯", "2× Priority Bug Bounty Pool", "Doubles next 2 accepted bug bounties to +50⚡", "-50⚡", isSpend = true)
+                KarmaRuleRow("⭐", "72h Veteran Tester Wave", "Prioritize 4.5★+ veteran 14-day finishers", "-75⚡", isSpend = true)
+                KarmaRuleRow("🚀", "48h Featured Spotlight", "Pins your app (+500 Discover score) for 48h", "-100⚡", isSpend = true)
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+
+            // Fair-Play & Accountability Rules
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Streak & Fair-Play Rules",
+                    text = "Fair-Play & Accountability Rules",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "• Publishing is free: Your Karma is never burned when publishing an app — it stays on your profile as your reciprocity multiplier.",
+                    text = "• 1-Day Grace Window: Missing 1 UTC day won't break your 14-day streak.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "• 1-Day Grace Window: Missing 1 UTC day won't break your 14-day streak (up to 1 grace day per campaign).",
+                    text = "• Early Uninstall (-20⚡ & -0.3★ Trust): Uninstalling mid-campaign resets your streak and hurts the developer's Play Console 12-tester count.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "• Keep Apps Installed: Uninstalling a closed-test app before Day 14 resets your streak to Day 0 and forfeits the +100⚡ completion bonus.",
+                    text = "• Spam Reports (-15⚡): Only applied if a report is explicitly flagged as SPAM (honest WONT_FIX reports are never penalized).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "• Ghost Enrollment Timeout (-10⚡): Enrolling without logging Day 1 within 72h releases your slot back to the pool.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "• Owner Triage Accountability (0.75× Rank): Leaving OPEN tester bug reports untouched for >7 days temporarily dips Discover visibility until reviewed.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -160,7 +181,8 @@ private fun KarmaRuleRow(
     icon: String,
     title: String,
     subtitle: String,
-    reward: String
+    reward: String,
+    isSpend: Boolean = false
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -197,14 +219,18 @@ private fun KarmaRuleRow(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .background(
+                        if (isSpend) MaterialTheme.colorScheme.secondaryContainer
+                        else MaterialTheme.colorScheme.primaryContainer
+                    )
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = reward,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = if (isSpend) MaterialTheme.colorScheme.onSecondaryContainer
+                    else MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }

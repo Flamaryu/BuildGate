@@ -1,5 +1,6 @@
 package dev.buildgate.app.entities.applisting.repository
 
+import dev.buildgate.app.entities.applisting.model.AppBoostType
 import dev.buildgate.app.entities.applisting.model.AppListing
 import dev.buildgate.app.entities.testmission.model.TestMission
 import dev.buildgate.app.shared.time.BuildGateClock
@@ -21,6 +22,7 @@ interface AppListingRepository {
     suspend fun updateMission(mission: TestMission)
     suspend fun deleteMission(missionId: String)
     suspend fun toggleMissionCompletion(missionId: String)
+    suspend fun spendKarmaForBoost(appId: String, boostType: AppBoostType): Result<Int>
 }
 
 class DemoAppListingRepository : AppListingRepository {
@@ -221,5 +223,28 @@ class DemoAppListingRepository : AppListingRepository {
         sampleMissions.update { list ->
             list.map { if (it.id == missionId) it.copy(isCompleted = !it.isCompleted) else it }
         }
+    }
+
+    override suspend fun spendKarmaForBoost(appId: String, boostType: AppBoostType): Result<Int> {
+        val target = listingsState.value.find { it.id == appId }
+            ?: return Result.failure(IllegalArgumentException("App not found"))
+        if (target.ownerKarmaBalance < boostType.costKarma) {
+            return Result.failure(IllegalStateException("Not enough Karma: need ${boostType.costKarma}⚡, you have ${target.ownerKarmaBalance}⚡"))
+        }
+        val remaining = target.ownerKarmaBalance - boostType.costKarma
+        val nowIso = BuildGateClock.nowIso()
+        listingsState.update { list ->
+            list.map { item ->
+                if (item.id == appId) {
+                    when (boostType) {
+                        AppBoostType.FEATURED_SPOTLIGHT -> item.copy(ownerKarmaBalance = remaining, featuredUntilIso = nowIso)
+                        AppBoostType.PRIORITY_BOUNTY_POOL -> item.copy(ownerKarmaBalance = remaining, priorityBountyRemaining = item.priorityBountyRemaining + 2)
+                        AppBoostType.BUILD_RETEST_PING -> item.copy(ownerKarmaBalance = remaining, retestPingUntilIso = nowIso)
+                        AppBoostType.VETERAN_WAVE -> item.copy(ownerKarmaBalance = remaining, veteranWaveUntilIso = nowIso)
+                    }
+                } else item
+            }
+        }
+        return Result.success(remaining)
     }
 }

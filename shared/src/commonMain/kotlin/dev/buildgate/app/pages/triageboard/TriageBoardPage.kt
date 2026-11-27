@@ -56,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.buildgate.app.entities.applisting.model.AppBoostType
 import dev.buildgate.app.entities.applisting.model.AppListing
 import dev.buildgate.app.entities.feedbackitem.model.FeedbackCategory
 import dev.buildgate.app.entities.feedbackitem.model.FeedbackItem
@@ -272,6 +273,7 @@ fun TriageBoardPage(
                                         onAddMissionClick = { selectedSubTabName = TriageSubTab.MISSIONS.name },
                                         onEditCampaignClick = { onEditCampaign(currentApp.id) },
                                         onOpenPacketClick = { onOpenProductionPacket(currentApp.id) },
+                                        onPurchaseBoost = { boost -> triageViewModel.purchaseAppBoost(boost) },
                                         onInspectIssue = { item ->
                                             triageViewModel.selectItem(item)
                                             selectedSubTabName = TriageSubTab.ISSUES.name
@@ -364,6 +366,7 @@ fun TriageBoardPage(
                                     onAddMissionClick = { selectedSubTabName = TriageSubTab.MISSIONS.name },
                                     onEditCampaignClick = { onEditCampaign(currentApp.id) },
                                     onOpenPacketClick = { onOpenProductionPacket(currentApp.id) },
+                                    onPurchaseBoost = { boost -> triageViewModel.purchaseAppBoost(boost) },
                                     onInspectIssue = { item ->
                                         triageViewModel.selectItem(item)
                                         selectedSubTabName = TriageSubTab.ISSUES.name
@@ -748,6 +751,7 @@ private fun DeveloperOverviewTab(
     onAddMissionClick: () -> Unit,
     onEditCampaignClick: () -> Unit,
     onOpenPacketClick: () -> Unit,
+    onPurchaseBoost: (AppBoostType) -> Unit,
     onInspectIssue: (FeedbackItem) -> Unit
 ) {
     val openIssues = items.filter { it.status == FeedbackStatus.OPEN }
@@ -892,6 +896,99 @@ private fun DeveloperOverviewTab(
                         }
                         OutlinedButton(onClick = onOpenPacketClick, shape = RoundedCornerShape(12.dp)) {
                             Text("📦 Export Play Packet")
+                        }
+                    }
+                }
+            }
+
+            // Karma Boosts Store (Spend Karma for High-Impact App Boosts)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "⚡ Karma Boosts Store",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Spend earned Karma to accelerate your 12-tester closed test (Balance: ${app.ownerKarmaBalance}⚡)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    AppBoostType.entries.forEach { boost ->
+                        val activeBadge = when (boost) {
+                            AppBoostType.FEATURED_SPOTLIGHT -> if (app.isFeaturedSpotlight) "ACTIVE" else null
+                            AppBoostType.PRIORITY_BOUNTY_POOL -> if (app.priorityBountyRemaining > 0) "${app.priorityBountyRemaining} left" else null
+                            AppBoostType.BUILD_RETEST_PING -> if (!app.retestPingUntilIso.isNullOrBlank()) "PINGED" else null
+                            AppBoostType.VETERAN_WAVE -> if (!app.veteranWaveUntilIso.isNullOrBlank()) "ACTIVE" else null
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = boost.icon, style = MaterialTheme.typography.titleMedium)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = boost.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (activeBadge != null) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = activeBadge,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = boost.description,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { onPurchaseBoost(boost) },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("-${boost.costKarma}⚡", fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                 }

@@ -168,6 +168,7 @@ fun StatusTag(status: FeedbackStatus) {
         FeedbackStatus.IN_PROGRESS -> Triple("IN PROGRESS", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
         FeedbackStatus.FIXED -> Triple("FIXED", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
         FeedbackStatus.WONT_FIX -> Triple("WON'T FIX", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+        FeedbackStatus.SPAM -> Triple("SPAM (-15⚡)", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
     }
 
     Box(

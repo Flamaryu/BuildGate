@@ -2,6 +2,7 @@ package dev.buildgate.app.features.triagefeedback
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.buildgate.app.entities.applisting.model.AppBoostType
 import dev.buildgate.app.entities.applisting.model.AppListing
 import dev.buildgate.app.entities.applisting.repository.AppListingRepository
 import dev.buildgate.app.entities.auth.repository.AuthRepository
@@ -237,6 +238,45 @@ class TriageFeedbackViewModel(
                 .onFailure {
                     _eventChannel.send(TriageUiEvent.ShowMessage("Could not upvote right now."))
                 }
+        }
+    }
+
+    fun purchaseAppBoost(boostType: AppBoostType) {
+        val current = uiState.value
+        val app = current.selectedApp
+        if (!current.canTriage || app == null) {
+            viewModelScope.launch {
+                _eventChannel.send(TriageUiEvent.ShowMessage("Only the app owner can activate Karma boosts."))
+            }
+            return
+        }
+        viewModelScope.launch {
+            val result = appListingRepository.spendKarmaForBoost(app.id, boostType)
+            result.onSuccess { remaining ->
+                if (current.currentUserId.isNotBlank()) {
+                    runCatching {
+                        authRepository.awardKarma(
+                            userId = current.currentUserId,
+                            delta = -boostType.costKarma,
+                            reason = when (boostType) {
+                                AppBoostType.FEATURED_SPOTLIGHT -> KarmaReason.FEATURED_SPOTLIGHT_SPEND
+                                AppBoostType.PRIORITY_BOUNTY_POOL -> KarmaReason.PRIORITY_BOUNTY_POOL_SPEND
+                                AppBoostType.BUILD_RETEST_PING -> KarmaReason.BUILD_RETEST_PING_SPEND
+                                AppBoostType.VETERAN_WAVE -> KarmaReason.VETERAN_WAVE_SPEND
+                            },
+                            appId = app.id,
+                            note = "${boostType.title} activated"
+                        )
+                    }
+                }
+                _eventChannel.send(
+                    TriageUiEvent.ShowMessage("${boostType.icon} ${boostType.title} activated! Remaining Karma: $remaining⚡")
+                )
+            }.onFailure { err ->
+                val raw = err.message.orEmpty()
+                val msg = raw.lineSequence().firstOrNull()?.take(140) ?: "Unable to activate boost right now."
+                _eventChannel.send(TriageUiEvent.ShowMessage(msg))
+            }
         }
     }
 

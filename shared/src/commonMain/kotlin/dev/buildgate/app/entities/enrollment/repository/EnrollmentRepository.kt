@@ -42,6 +42,7 @@ interface EnrollmentRepository {
         installedVersionCode: Long? = null
     ): VerificationOutcome
     fun getVerificationsForEnrollment(enrollmentId: String): Flow<List<DailyVerification>>
+    suspend fun purchaseGraceShield(enrollmentId: String): Result<Int>
 }
 
 class DemoEnrollmentRepository : EnrollmentRepository {
@@ -223,4 +224,17 @@ class DemoEnrollmentRepository : EnrollmentRepository {
 
     override fun getVerificationsForEnrollment(enrollmentId: String): Flow<List<DailyVerification>> =
         verificationsState.map { list -> list.filter { it.enrollmentId == enrollmentId } }
+
+    override suspend fun purchaseGraceShield(enrollmentId: String): Result<Int> {
+        var updatedExtra = 0
+        enrollmentsState.update { list ->
+            list.map { enr ->
+                if (enr.id == enrollmentId && enr.extraGraceDays < 3) {
+                    updatedExtra = enr.extraGraceDays + 1
+                    enr.copy(extraGraceDays = updatedExtra)
+                } else enr
+            }
+        }
+        return Result.success(updatedExtra)
+    }
 }

@@ -1,5 +1,6 @@
 package dev.buildgate.app.shared.network
 
+import dev.buildgate.app.entities.applisting.model.AppBoostType
 import dev.buildgate.app.entities.applisting.model.AppListing
 import dev.buildgate.app.entities.applisting.repository.AppListingRepository
 import dev.buildgate.app.entities.auth.model.AuthSession
@@ -373,6 +374,19 @@ class SupabaseAppListingRepository(
             }
         }
     }
+
+    override suspend fun spendKarmaForBoost(appId: String, boostType: AppBoostType): Result<Int> = runCatching {
+        val numericAppId = appId.toLongOrNull() ?: error("Invalid app ID")
+        val json = client.postgrest.rpc(
+            "spend_karma_for_app_boost",
+            buildJsonObject {
+                put("p_app_id", numericAppId)
+                put("p_boost_type", boostType.name)
+            }
+        ).decodeAs<JsonObject>()
+        refreshAll()
+        json["remaining_karma"]?.jsonPrimitive?.intOrNull ?: 0
+    }
 }
 
 class SupabaseEnrollmentRepository(
@@ -546,6 +560,16 @@ class SupabaseEnrollmentRepository(
 
     override fun getVerificationsForEnrollment(enrollmentId: String): Flow<List<DailyVerification>> =
         verificationsState.map { list -> list.filter { it.enrollmentId == enrollmentId } }
+
+    override suspend fun purchaseGraceShield(enrollmentId: String): Result<Int> = runCatching {
+        val numericId = enrollmentId.toLongOrNull() ?: error("Invalid enrollment ID")
+        val json = client.postgrest.rpc(
+            "purchase_grace_shield",
+            buildJsonObject { put("p_enrollment_id", numericId) }
+        ).decodeAs<JsonObject>()
+        refresh()
+        json["extra_grace_days"]?.jsonPrimitive?.intOrNull ?: 1
+    }
 }
 
 class SupabaseFeedbackRepository(

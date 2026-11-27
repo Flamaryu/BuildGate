@@ -32,6 +32,8 @@ Features live in the Android app, Web Companion, and Supabase backend.
 | `BG-011` | Foldable Continuity (Cover ↔ Inner Screen) | Android UX | — | — | `configChanges` + `movableContentOf` + `rememberSaveable` |
 | `BG-018` | In-Overlay Mission Checklist & Pass/Fail Tap | Android QA | 0 | 1 | Check off Pass or tap Fail to auto-pause & pre-fill bug sheet inside floating pill |
 | `BG-019` | Edit / Update Published Campaign & Build Version | Developer | 0 | 1 | Bump build tag & `minVersionCode`, edit links, or upgrade No-Code ➔ Deep-Link Handshake |
+| `BG-027` | Web Developer Command Center & QA Missions Studio | Web / Developer | 0 | 1 | Branded desktop sidebar, 2-pane app switcher, docked Issue Inspector, full Mission Create/Edit/Delete + RLS |
+| `BG-028` | Karma Economy v2 (Spend Boosts + Fair-Play Accountability) | Economy / Anti-Cheat | 0 | 1 | 48h Featured Spotlight, 2× Bounty Pool, Re-Test Ping, Veteran Wave, Grace Shield, SPAM/Uninstall/Stale-Triage rules + Explainer Sheet |
 
 ---
 

@@ -22,6 +22,7 @@ data class Enrollment(
     @SerialName("verified_days_count") val verifiedDaysCount: Int = 0,
     @SerialName("current_streak") val currentStreak: Int = 0,
     @SerialName("missed_days_used") val missedDaysUsed: Int = 0,
+    @SerialName("extra_grace_days") val extraGraceDays: Int = 0,
     @SerialName("last_verified_utc_date") val lastVerifiedUtcDate: String? = null,
     @SerialName("last_seen_version_code") val lastSeenVersionCode: Long? = null,
     val status: EnrollmentStatus = EnrollmentStatus.ACTIVE,

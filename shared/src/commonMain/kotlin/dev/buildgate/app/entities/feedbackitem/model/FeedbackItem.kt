@@ -11,7 +11,7 @@ enum class FeedbackCategory {
 
 @Serializable
 enum class FeedbackStatus {
-    OPEN, IN_PROGRESS, FIXED, WONT_FIX
+    OPEN, IN_PROGRESS, FIXED, WONT_FIX, SPAM
 }
 
 @Serializable
