@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +52,7 @@ import dev.buildgate.app.features.auth.AuthViewModel
 import dev.buildgate.app.shared.notifications.DailyQueueReminderPreferences
 import dev.buildgate.app.shared.notifications.sendTestDailyQueueReminder
 import dev.buildgate.app.shared.notifications.supportsLocalReminders
+import dev.buildgate.app.shared.platform.PlatformVerifier
 import dev.buildgate.app.shared.theme.BuildGateThemeMode
 import dev.buildgate.app.shared.theme.BuildGateThemePreferences
 import dev.buildgate.app.shared.time.BuildGateClock
@@ -74,6 +77,7 @@ fun AccountPage(
     val remindersEnabled by DailyQueueReminderPreferences.enabled.collectAsState()
     val scope = rememberCoroutineScope()
     val enrollmentRepo: EnrollmentRepository = koinInject()
+    val platformVerifier: PlatformVerifier = koinInject()
     val activeUserId = session.user?.id ?: if (session.isDemoMode) "tester_1" else ""
     val enrollmentsFlow = remember(activeUserId) { enrollmentRepo.getEnrollmentsForTester(activeUserId) }
     val userEnrollments by enrollmentsFlow.collectAsState(initial = emptyList())
@@ -85,12 +89,110 @@ fun AccountPage(
     }
     var isCreateAccountMode by remember { mutableStateOf(false) }
     var showKarmaSheet by remember { mutableStateOf(false) }
+    var deleteDialogStep by remember { mutableStateOf(0) } // 0 = closed, 1 = warning, 2 = type DELETE
+    var deleteConfirmInput by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
 
     if (showKarmaSheet) {
         KarmaExplainerSheet(
             currentKarma = session.profile?.karmaPoints ?: 50,
             onDismiss = { showKarmaSheet = false }
+        )
+    }
+
+    if (deleteDialogStep == 1) {
+        AlertDialog(
+            onDismissRequest = { deleteDialogStep = 0 },
+            title = {
+                Text(
+                    text = "⚠️ Delete Account? (Step 1 of 2)",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "This action is permanent and cannot be undone. Deleting your BuildGate account immediately erases:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "• Your login credentials, profile handle, and Karma ledger\n• Your published app campaigns & QA missions\n• Your active/completed 14-day enrollments & streak history\n• Your submitted bug reports",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deleteConfirmInput = ""
+                        deleteDialogStep = 2
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Continue to Final Confirmation")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteDialogStep = 0 }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    } else if (deleteDialogStep == 2) {
+        val isConfirmed = deleteConfirmInput.trim() == "DELETE"
+        AlertDialog(
+            onDismissRequest = {
+                deleteDialogStep = 0
+                deleteConfirmInput = ""
+            },
+            title = {
+                Text(
+                    text = "Final Confirmation (Step 2 of 2)",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Type DELETE in all caps below to permanently erase your account (${session.user?.email.orEmpty()}).",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = deleteConfirmInput,
+                        onValueChange = { deleteConfirmInput = it },
+                        label = { Text("Type DELETE to confirm") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deleteDialogStep = 0
+                        deleteConfirmInput = ""
+                        viewModel.deleteAccount()
+                    },
+                    enabled = isConfirmed && !isBusy,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(if (isBusy) "Deleting..." else "Permanently Delete Account")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        deleteDialogStep = 0
+                        deleteConfirmInput = ""
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 
@@ -468,6 +570,63 @@ fun AccountPage(
                                     if (isCreateAccountMode) "Already have an account? Sign In"
                                     else "New to BuildGate? Create Account (+50⚡)"
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Legal, Privacy Policy & Danger Zone (always accessible in Account tab)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "🔒 Privacy & Legal",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Review how BuildGate handles Usage Access, bug media on Cloudflare R2, and self-service data deletion.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { platformVerifier.openExternalUrl("https://buildgatehub.com/privacy") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Open Privacy Policy (buildgatehub.com/privacy) ↗")
+                        }
+
+                        if (session.isLoggedIn) {
+                            HorizontalDivider()
+                            Text(
+                                text = "⚠️ Danger Zone",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "Permanently delete your BuildGate account, profile, campaigns, enrollments, and bug reports (double-verified).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(
+                                onClick = { deleteDialogStep = 1 },
+                                enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("🗑️ Delete Account & All Data")
                             }
                         }
                     }

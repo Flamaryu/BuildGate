@@ -223,6 +223,13 @@ class SupabaseAuthRepository(
         runCatching { client.auth.signOut() }
         sessionState.value = AuthSession(isLoggedIn = false, isDemoMode = false)
     }
+
+    override suspend fun deleteAccount(): Result<Unit> = runCatching {
+        client.postgrest.rpc("delete_own_account")
+        runCatching { client.auth.signOut() }
+        ledgerCache.value = emptyList()
+        sessionState.value = AuthSession(isLoggedIn = false, isDemoMode = false)
+    }
 }
 
 class SupabaseAppListingRepository(

@@ -176,12 +176,128 @@ async function handleMediaServe(request: Request, env: Env, url: URL): Promise<R
   return new Response(bodyObj.body, { status: 200, headers });
 }
 
+function handlePrivacyPolicyPage(): Response {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — BuildGate Hub</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    :root { --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --muted:#94a3b8; --accent:#818cf8; --mint:#34d399; --danger:#f87171; --border:rgba(148,163,184,0.2); }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.65; }
+    .wrap { max-width:820px; margin:0 auto; padding:36px 20px 64px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:28px; flex-wrap:wrap; }
+    .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--text); font-weight:800; font-size:20px; }
+    .brand img { width:36px; height:36px; }
+    .back { color:var(--accent); text-decoration:none; font-weight:600; font-size:14px; }
+    h1 { font-size:30px; margin:0 0 8px; }
+    .updated { color:var(--muted); font-size:13px; margin-bottom:28px; }
+    section { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:22px; margin-bottom:18px; }
+    h2 { font-size:18px; margin:0 0 10px; color:#e2e8f0; }
+    p, li { color:#cbd5e1; font-size:15px; }
+    ul { padding-left:20px; margin:8px 0 0; }
+    li { margin-bottom:6px; }
+    .callout { border-left:4px solid var(--mint); padding:12px 14px; background:rgba(16,185,129,0.08); border-radius:8px; margin-top:10px; }
+    .danger { border-left:4px solid var(--danger); padding:12px 14px; background:rgba(248,113,113,0.08); border-radius:8px; margin-top:10px; }
+    code { background:rgba(15,23,42,0.7); padding:2px 6px; border-radius:6px; font-size:13px; color:#c7d2fe; }
+    footer { text-align:center; color:var(--muted); font-size:13px; margin-top:32px; padding-top:20px; border-top:1px solid var(--border); }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="/">
+        <img src="/favicon.svg" alt="BuildGate Logo" />
+        <span>BuildGate Hub</span>
+      </a>
+      <a class="back" href="/">← Back to BuildGate App</a>
+    </header>
+
+    <h1>Privacy Policy</h1>
+    <p class="updated">Effective Date: November 27, 2026 &nbsp;•&nbsp; App Package: <code>com.buildgatehub.app</code> &nbsp;•&nbsp; Website: <a href="https://buildgatehub.com">buildgatehub.com</a></p>
+
+    <section>
+      <h2>1. Who We Are</h2>
+      <p>BuildGate Hub ("BuildGate", "we", "us") is a closed-testing verification and QA collaboration platform for independent Android developers and testers, operated by MKD Interactive.</p>
+    </section>
+
+    <section>
+      <h2>2. Information We Collect</h2>
+      <ul>
+        <li><strong>Account Information:</strong> Email address, chosen developer/tester handle, and authentication identifiers managed via Supabase Auth.</li>
+        <li><strong>Testing &amp; Campaign Activity:</strong> Enrolled apps, daily 60-second verification timestamps, 14-day continuity streaks, QA mission checkoffs, and Karma ledger history.</li>
+        <li><strong>Bug Reports &amp; Optional Media:</strong> Bug titles, reproduction notes, hardware metadata (device model, Android OS version, screen resolution), and optional screenshots or 15-second screen clips that you explicitly capture and submit. Media files are stored on Cloudflare R2 and served over HTTPS.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Android Sensitive Permissions &amp; How They Are Used</h2>
+      <ul>
+        <li><strong>Usage Access (<code>PACKAGE_USAGE_STATS</code> — Optional):</strong> Only used if you explicitly opt in after reviewing our in-app disclosure. During an active 60-second QA testing session, BuildGate checks solely whether the enrolled target app remains in the foreground so the timer pauses if you switch away or lock your screen. We <strong>never</strong> read messages, browsing history, or upload lists of unrelated apps to our servers.</li>
+        <li><strong>Screen Capture (<code>MediaProjection</code> &amp; Foreground Service):</strong> Activated strictly on demand after Android's system consent prompt when you tap <em>Screenshot</em> or <em>15s Clip</em> inside the floating QA overlay to attach bug evidence.</li>
+        <li><strong>Display Over Other Apps (<code>SYSTEM_ALERT_WINDOW</code>):</strong> Powers the optional floating QA timer pill and inline bug-reporting sheet while you test a closed-beta app. You can close the pill at any time via the in-pill Close button or persistent notification.</li>
+        <li><strong>Installed Package Checks:</strong> Uses Android's PackageManager solely to verify whether an app you explicitly enrolled in is installed and matches the developer's minimum build version code.</li>
+        <li><strong>Notifications (<code>POST_NOTIFICATIONS</code>):</strong> Used for the active QA session controls and optional local daily queue streak reminders (configurable in the Account tab).</li>
+      </ul>
+      <div class="callout">
+        <strong>Zero Ad Trackers &amp; No Data Selling:</strong> BuildGate does not sell your personal data, does not run third-party advertising SDKs, and does not track you across unrelated apps.
+      </div>
+    </section>
+
+    <section id="account-deletion">
+      <h2>4. Account &amp; Data Deletion (Double-Verified Self-Service)</h2>
+      <p>You can permanently delete your BuildGate account and all associated data at any time from either the <strong>BuildGate Android app</strong> or the <strong>BuildGate website</strong> (<a href="https://buildgatehub.com">https://buildgatehub.com</a>):</p>
+      <ol style="color:#cbd5e1;font-size:15px;padding-left:20px;">
+        <li>Sign in and open the <strong>Account</strong> tab.</li>
+        <li>Scroll to the <strong>Danger Zone</strong> section and tap <strong>Delete Account &amp; All Data</strong>.</li>
+        <li><strong>Step 1 Verification:</strong> Review the summary of data to be permanently erased and tap <em>Continue to Final Confirmation</em>.</li>
+        <li><strong>Step 2 Verification:</strong> Type <code>DELETE</code> to confirm and tap <em>Permanently Delete Account</em>.</li>
+      </ol>
+      <div class="danger">
+        <strong>What Is Permanently Deleted Immediately:</strong> Your authentication credentials, developer/tester profile, Karma balance &amp; ledger history, published app campaigns, QA missions, active/completed enrollments, daily verification logs, and submitted bug reports are immediately and irreversibly deleted via cascading database deletion. Any uploaded bug media files can also be purged upon request by emailing <a href="mailto:mkd-interactive.admin@gmail.com">mkd-interactive.admin@gmail.com</a>.
+      </div>
+    </section>
+
+    <section>
+      <h2>5. Security &amp; Infrastructure</h2>
+      <p>All traffic between the BuildGate Android app, website, Supabase (PostgreSQL with Row Level Security), and Cloudflare Workers/R2 is encrypted in transit using HTTPS/TLS.</p>
+    </section>
+
+    <section>
+      <h2>6. Contact Us</h2>
+      <p>Questions, privacy requests, or manual data-deletion requests? Email us at <a href="mailto:mkd-interactive.admin@gmail.com">mkd-interactive.admin@gmail.com</a>.</p>
+    </section>
+
+    <footer>
+      © 2026 BuildGate Hub (MKD Interactive) &nbsp;•&nbsp; <a href="https://buildgatehub.com">buildgatehub.com</a> &nbsp;•&nbsp; <a href="https://buildgatehub.com/privacy">Privacy Policy</a>
+    </footer>
+  </div>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+    },
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
+    }
+
+    if ((url.pathname === "/privacy" || url.pathname === "/privacy-policy") && request.method === "GET") {
+      return handlePrivacyPolicyPage();
     }
 
     if (url.pathname === "/api/media/upload" && request.method === "POST") {

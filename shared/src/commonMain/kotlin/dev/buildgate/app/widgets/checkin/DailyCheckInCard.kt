@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -21,6 +22,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +59,58 @@ fun DailyCheckInCard(
     onEnableUsageAccessClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showUsageDisclosure by remember { mutableStateOf(false) }
+
+    if (showUsageDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showUsageDisclosure = false },
+            title = {
+                Text(
+                    text = "🛡️ Usage Access Disclosure",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "BuildGate optionally uses Android Usage Access (PACKAGE_USAGE_STATS) ONLY while an active 60-second QA timer is running.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "• What is checked: Whether the enrolled closed-test app (${app.title}) stays in the foreground so the timer pauses if you switch away or lock your screen.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "• What is NEVER collected: BuildGate never reads your messages, browsing history, or uploads your list of unrelated apps.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "You can revoke Usage Access anytime in Android Settings. See our Privacy Policy at buildgatehub.com/privacy.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUsageDisclosure = false
+                        onEnableUsageAccessClick()
+                    }
+                ) {
+                    Text("Continue to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUsageDisclosure = false }) {
+                    Text("Not Now")
+                }
+            }
+        )
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -222,7 +279,7 @@ fun DailyCheckInCard(
                     )
                 }
                 if (!hasUsageStatsPermission) {
-                    TextButton(onClick = onEnableUsageAccessClick) {
+                    TextButton(onClick = { showUsageDisclosure = true }) {
                         Text("Enable")
                     }
                 }

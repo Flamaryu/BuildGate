@@ -99,6 +99,7 @@ fun AppShell() {
             val enrollmentRepo: EnrollmentRepository = koinInject()
             val authRepo: AuthRepository = koinInject()
             val feedbackRepo: FeedbackRepository = koinInject()
+            val platformVerifier: dev.buildgate.app.shared.platform.PlatformVerifier = koinInject()
 
             val authSession by authViewModel.sessionState.collectAsState()
             val allListings by appListingRepo.getListings().collectAsState(initial = emptyList())
@@ -420,6 +421,7 @@ fun AppShell() {
                             themeMode = themeMode,
                             onCycleTheme = { BuildGateThemePreferences.cycleThemeMode() },
                             onOpenKarmaInfo = { showKarmaSheet = true },
+                            onOpenPrivacyPolicy = { platformVerifier.openExternalUrl("https://buildgatehub.com/privacy") },
                             onTabSelected = { onTabSelected(it) }
                         )
                         VerticalDivider(
@@ -470,6 +472,7 @@ private fun DesktopBrandSidebar(
     themeMode: BuildGateThemeMode,
     onCycleTheme: () -> Unit,
     onOpenKarmaInfo: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     onTabSelected: (TopLevelTab) -> Unit
 ) {
     Surface(
@@ -618,6 +621,26 @@ private fun DesktopBrandSidebar(
                             )
                         }
                     }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(onClick = onOpenPrivacyPolicy)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🔒 Privacy Policy",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "↗",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }

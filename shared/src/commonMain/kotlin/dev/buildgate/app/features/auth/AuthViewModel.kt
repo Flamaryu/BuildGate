@@ -97,4 +97,23 @@ class AuthViewModel(
             _eventChannel.send(AuthUiEvent.ShowMessage("Signed out"))
         }
     }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _isBusy.value = true
+            val res = authRepository.deleteAccount()
+            _isBusy.value = false
+            res.fold(
+                onSuccess = {
+                    _emailInput.value = ""
+                    _passwordInput.value = ""
+                    _usernameInput.value = ""
+                    _eventChannel.send(AuthUiEvent.ShowMessage("Your account and all associated data have been permanently deleted."))
+                },
+                onFailure = {
+                    _eventChannel.send(AuthUiEvent.ShowMessage("Could not delete account: ${it.message ?: "unknown error"}"))
+                }
+            )
+        }
+    }
 }

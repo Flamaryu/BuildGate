@@ -23,6 +23,7 @@ interface AuthRepository {
     suspend fun awardKarma(userId: String, delta: Int, reason: KarmaReason, appId: String? = null, note: String = "")
     suspend fun handleAuthCallbackUri(uri: String): Boolean
     suspend fun signOut()
+    suspend fun deleteAccount(): Result<Unit>
 }
 
 class DemoAuthRepository : AuthRepository {
@@ -182,5 +183,15 @@ class DemoAuthRepository : AuthRepository {
 
     override suspend fun signOut() {
         sessionState.value = AuthSession(isLoggedIn = false, isDemoMode = true)
+    }
+
+    override suspend fun deleteAccount(): Result<Unit> {
+        val uid = sessionState.value.user?.id
+        if (uid != null) {
+            profilesById.update { it - uid }
+            ledgerState.update { list -> list.filterNot { it.userId == uid } }
+        }
+        sessionState.value = AuthSession(isLoggedIn = false, isDemoMode = true)
+        return Result.success(Unit)
     }
 }
