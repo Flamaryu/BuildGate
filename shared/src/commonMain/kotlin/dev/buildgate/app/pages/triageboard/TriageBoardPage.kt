@@ -375,51 +375,52 @@ fun TriageBoardPage(
                             }
 
                             TriageSubTab.ISSUES -> {
-                                Column(
+                                LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     triageState.selectedItem?.let { sel ->
-                                        SelectedFeedbackDetailCard(
-                                            item = sel,
-                                            canTriage = triageState.canTriage,
-                                            onOpenMediaUrl = { platformVerifier.openExternalUrl(it) },
-                                            onStatusChange = { status -> triageViewModel.updateStatus(sel.id, status) },
-                                            onClose = { triageViewModel.selectItem(null) }
-                                        )
+                                        item(key = "selected_issue_${sel.id}") {
+                                            SelectedFeedbackDetailCard(
+                                                item = sel,
+                                                canTriage = triageState.canTriage,
+                                                onOpenMediaUrl = { platformVerifier.openExternalUrl(it) },
+                                                onStatusChange = { status -> triageViewModel.updateStatus(sel.id, status) },
+                                                onClose = { triageViewModel.selectItem(null) }
+                                            )
+                                        }
                                     }
 
                                     if (!triageState.canTriage) {
-                                        ReadOnlyNoticeBanner()
+                                        item(key = "readonly_notice") {
+                                            ReadOnlyNoticeBanner()
+                                        }
                                     }
 
                                     if (triageState.items.isEmpty()) {
-                                        EmptyIssuesCard(currentApp.title)
+                                        item(key = "empty_issues") {
+                                            EmptyIssuesCard(currentApp.title)
+                                        }
                                     } else {
-                                        LazyColumn(
-                                            modifier = Modifier.weight(1f),
-                                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            items(triageState.items, key = { it.id }) { item ->
-                                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                    FeedbackItemCard(
-                                                        item = item,
-                                                        onUpvoteClick = { triageViewModel.upvote(item.id) },
-                                                        onCardClick = { triageViewModel.selectItem(item) }
-                                                    )
-                                                    if (triageState.canTriage) {
-                                                        val (nextStatus, nextLabel) = when (item.status) {
-                                                            FeedbackStatus.OPEN -> FeedbackStatus.IN_PROGRESS to "Move to Progress ➔"
-                                                            FeedbackStatus.IN_PROGRESS -> FeedbackStatus.FIXED to "Mark Fixed ✅"
-                                                            else -> FeedbackStatus.OPEN to "Reopen ↺"
-                                                        }
-                                                        OutlinedButton(
-                                                            onClick = { triageViewModel.updateStatus(item.id, nextStatus) },
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            shape = RoundedCornerShape(10.dp)
-                                                        ) {
-                                                            Text(nextLabel, style = MaterialTheme.typography.labelMedium)
-                                                        }
+                                        items(triageState.items, key = { it.id }) { item ->
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                FeedbackItemCard(
+                                                    item = item,
+                                                    onUpvoteClick = { triageViewModel.upvote(item.id) },
+                                                    onCardClick = { triageViewModel.selectItem(item) }
+                                                )
+                                                if (triageState.canTriage) {
+                                                    val (nextStatus, nextLabel) = when (item.status) {
+                                                        FeedbackStatus.OPEN -> FeedbackStatus.IN_PROGRESS to "Move to Progress ➔"
+                                                        FeedbackStatus.IN_PROGRESS -> FeedbackStatus.FIXED to "Mark Fixed ✅"
+                                                        else -> FeedbackStatus.OPEN to "Reopen ↺"
+                                                    }
+                                                    OutlinedButton(
+                                                        onClick = { triageViewModel.updateStatus(item.id, nextStatus) },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        shape = RoundedCornerShape(10.dp)
+                                                    ) {
+                                                        Text(nextLabel, style = MaterialTheme.typography.labelMedium)
                                                     }
                                                 }
                                             }
