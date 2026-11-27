@@ -30,6 +30,7 @@ Features live in the Android app, Web Companion, and Supabase backend.
 | `BG` | Unified Tier-2 Deep-Link Handshake + 6-Stack Publish Wizard | Developer | — | — | No-Code vs. Deep-Link cards; Kotlin/Java/Flutter/RN/Unity/Godot split snippets + ADB test |
 | `BG` | Role-Scoped QA & Triage Hub (Owner vs. Read-Only Known Issues) | Developer / Tester | — | — | Grouped App Picker, sub-tabs, +25⚡ bug bounties, Play Packet export |
 | `BG` | Foldable Continuity (Cover ↔ Inner Screen) | Android UX | — | — | `configChanges` + `movableContentOf` + `rememberSaveable` |
+| `BG-013` | Hosted Web Companion + Cloudflare R2 Media Storage | Web / Infra | 0 | 1 | Live at `https://buildgatehub.com` on Cloudflare Workers Static Assets + `buildgate-media` R2 bucket |
 
 ---
 
@@ -59,7 +60,6 @@ High-priority features approved for upcoming milestones.
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
 | `BG-011` | **AI QA Mission Generator (Gemini)** | AI / Developer | 0 | 1 | P0 | Paste app description or release notes ➔ AI generates concrete, testable QA missions |
 | `BG-012` | **Randomized / Stratified Mission Assignment** | AI / QA | 0 | 1 | P0 | Randomly assigns different missions across your 16+ testers so every screen/flow gets coverage instead of everyone testing screen 1 |
-| `BG-013` | **Hosted Web Companion + HTTPS App Links** | Web / Infra | 0 | 1 | P0 | Deploy WasmJS/JS bundle to custom domain (`buildgatehub.com`) with `.well-known/assetlinks.json` |
 | `BG-014` | **Smart Daily Streak Push Reminders (FCM + Cron)** | Retention | 0 | 1 | P1 | Remind testers 2h before UTC midnight if they have unverified queued apps; alert devs before Day-14 roster drops below 12 |
 | `BG-010` | **In-Overlay Mission Checklist & Pass/Fail Tap** | Android QA | 0 | 1 | P1 | Show the tester's assigned mission right inside the floating pill so they can mark Pass/Fail or attach proof without leaving the app |
 | `BG-015` | **Edit / Update Published Campaign & Build Version** | Developer | 0 | 1 | P1 | Let app owners bump `currentBuildVersion`, update Play/Group links, or upgrade from No-Code to Deep-Link Handshake |

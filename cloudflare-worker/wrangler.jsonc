@@ -16,9 +16,12 @@
   "vars": {
     "SUPABASE_URL": "https://lrqwkdqheumyigrpqevw.supabase.co",
     "PUBLIC_ORIGIN": "https://buildgatehub.com"
-  }
-  // Uncomment after enabling R2 in Cloudflare Dashboard and creating bucket "buildgate-media":
-  // ,"r2_buckets": [
-  //   { "binding": "MEDIA_BUCKET", "bucket_name": "buildgate-media" }
-  // ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "buildgate-media",
+      "remote": true
+    }
+  ]
 }
