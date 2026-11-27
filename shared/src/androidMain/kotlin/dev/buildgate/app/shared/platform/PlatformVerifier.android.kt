@@ -219,6 +219,7 @@ fun initAndroidPlatformVerifier(context: Context) {
     val appCtx = context.applicationContext
     appContextProvider = { appCtx }
     dev.buildgate.app.shared.theme.BuildGateThemePreferences.reloadFromStorage()
+    dev.buildgate.app.shared.notifications.DailyQueueReminderPreferences.reloadFromStorage()
 }
 
 actual fun getPlatformVerifier(): PlatformVerifier = AndroidPlatformVerifier(appContextProvider)

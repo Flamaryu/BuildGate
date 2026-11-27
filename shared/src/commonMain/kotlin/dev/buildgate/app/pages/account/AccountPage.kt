@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -34,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,10 +47,15 @@ import dev.buildgate.app.entities.enrollment.model.EnrollmentStatus
 import dev.buildgate.app.entities.enrollment.repository.EnrollmentRepository
 import dev.buildgate.app.features.auth.AuthUiEvent
 import dev.buildgate.app.features.auth.AuthViewModel
+import dev.buildgate.app.shared.notifications.DailyQueueReminderPreferences
+import dev.buildgate.app.shared.notifications.sendTestDailyQueueReminder
+import dev.buildgate.app.shared.notifications.supportsLocalReminders
 import dev.buildgate.app.shared.theme.BuildGateThemeMode
 import dev.buildgate.app.shared.theme.BuildGateThemePreferences
+import dev.buildgate.app.shared.time.BuildGateClock
 import dev.buildgate.app.widgets.devicetable.DeviceMetadataTable
 import dev.buildgate.app.widgets.karma.KarmaExplainerSheet
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,12 +71,18 @@ fun AccountPage(
     val passwordInput by viewModel.passwordInput.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
     val themeMode by BuildGateThemePreferences.themeMode.collectAsState()
+    val remindersEnabled by DailyQueueReminderPreferences.enabled.collectAsState()
+    val scope = rememberCoroutineScope()
     val enrollmentRepo: EnrollmentRepository = koinInject()
     val activeUserId = session.user?.id ?: if (session.isDemoMode) "tester_1" else ""
     val enrollmentsFlow = remember(activeUserId) { enrollmentRepo.getEnrollmentsForTester(activeUserId) }
     val userEnrollments by enrollmentsFlow.collectAsState(initial = emptyList())
     val activeTestsCount = userEnrollments.count { it.status == EnrollmentStatus.ACTIVE }
     val totalVerifiedDays = userEnrollments.sumOf { it.verifiedDaysCount }
+    val todayUtc = BuildGateClock.todayUtcDate()
+    val pendingTodayCount = userEnrollments.count {
+        it.status == EnrollmentStatus.ACTIVE && it.lastVerifiedUtcDate != todayUtc && it.currentStreak < 14
+    }
     var isCreateAccountMode by remember { mutableStateOf(false) }
     var showKarmaSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -149,6 +162,60 @@ fun AccountPage(
                                     label = { Text("${mode.icon} ${mode.label}") },
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (supportsLocalReminders) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "🔔 Daily Streak Reminders",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Notify me 2h before UTC midnight if apps remain in my Daily Queue ($pendingTodayCount left today)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = remindersEnabled,
+                                    onCheckedChange = { DailyQueueReminderPreferences.setEnabled(it) }
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val sent = sendTestDailyQueueReminder(pendingTodayCount, emptyList())
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (sent) "🔔 Test reminder sent! Check your notification shade."
+                                            else "Enable Notifications for BuildGate in Android Settings to test."
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Send Test Queue Notification")
                             }
                         }
                     }

@@ -67,9 +67,12 @@ import dev.buildgate.app.pages.publish.PublishAppPage
 import dev.buildgate.app.pages.sessionverification.SessionVerificationPage
 import dev.buildgate.app.pages.triageboard.TriageBoardPage
 import dev.buildgate.app.app.di.koinScopedViewModel
+import dev.buildgate.app.shared.notifications.DailyQueueReminderPreferences
+import dev.buildgate.app.shared.notifications.syncDailyQueueReminder
 import dev.buildgate.app.shared.theme.BuildGateTheme
 import dev.buildgate.app.shared.theme.BuildGateThemeMode
 import dev.buildgate.app.shared.theme.BuildGateThemePreferences
+import dev.buildgate.app.shared.time.BuildGateClock
 import dev.buildgate.app.shared.ui.BuildGateLogo
 import dev.buildgate.app.widgets.karma.KarmaExplainerSheet
 import org.koin.compose.KoinApplication
@@ -101,6 +104,23 @@ fun AppShell() {
             val allListings by appListingRepo.getListings().collectAsState(initial = emptyList())
             val currentUserId = authSession.user?.id ?: if (authSession.isDemoMode) "tester_1" else ""
             val currentUsername = authSession.profile?.username ?: "Tester"
+            val remindersEnabled by DailyQueueReminderPreferences.enabled.collectAsState()
+            val userEnrollmentsFlow = remember(currentUserId) { enrollmentRepo.getEnrollmentsForTester(currentUserId) }
+            val userEnrollments by userEnrollmentsFlow.collectAsState(initial = emptyList())
+
+            // Keep native Android Daily Queue streak reminder synchronized with remaining apps today
+            LaunchedEffect(remindersEnabled, userEnrollments, allListings) {
+                val todayUtc = BuildGateClock.todayUtcDate()
+                val pendingEnrollments = userEnrollments.filter { enr ->
+                    enr.status == dev.buildgate.app.entities.enrollment.model.EnrollmentStatus.ACTIVE &&
+                        enr.lastVerifiedUtcDate != todayUtc &&
+                        enr.currentStreak < 14
+                }
+                val titles = pendingEnrollments.mapNotNull { enr ->
+                    allListings.find { it.id == enr.appId }?.title
+                }
+                syncDailyQueueReminder(pendingEnrollments.size, titles)
+            }
 
             val incomingLink by DeepLinkRouter.incomingLinks.collectAsState()
             val pendingMediaDraft by QaMediaCaptureBus.pendingDraft.collectAsState()

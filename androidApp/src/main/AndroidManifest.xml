@@ -88,6 +88,11 @@
                 android:value="Active closed-testing QA session timer, pause control, and floating bug-reporting overlay" />
         </service>
 
+        <!-- Daily Queue Streak Reminder Notification Receiver (2h before UTC midnight) -->
+        <receiver
+            android:name="dev.buildgate.app.shared.notifications.DailyQueueReminderReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
