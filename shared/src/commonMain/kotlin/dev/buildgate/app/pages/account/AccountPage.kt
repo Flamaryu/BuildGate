@@ -1,6 +1,7 @@
 package dev.buildgate.app.pages.account
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,7 @@ import dev.buildgate.app.features.auth.AuthViewModel
 import dev.buildgate.app.shared.theme.BuildGateThemeMode
 import dev.buildgate.app.shared.theme.BuildGateThemePreferences
 import dev.buildgate.app.widgets.devicetable.DeviceMetadataTable
+import dev.buildgate.app.widgets.karma.KarmaExplainerSheet
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +71,15 @@ fun AccountPage(
     val activeTestsCount = userEnrollments.count { it.status == EnrollmentStatus.ACTIVE }
     val totalVerifiedDays = userEnrollments.sumOf { it.verifiedDaysCount }
     var isCreateAccountMode by remember { mutableStateOf(false) }
+    var showKarmaSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    if (showKarmaSheet) {
+        KarmaExplainerSheet(
+            currentKarma = session.profile?.karmaPoints ?: 50,
+            onDismiss = { showKarmaSheet = false }
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -193,7 +203,8 @@ fun AccountPage(
                                     StatPill(
                                         label = "⚡ Karma",
                                         value = "${profile.karmaPoints}",
-                                        subtitle = "Boosts your apps",
+                                        subtitle = "Tap to learn ⓘ",
+                                        onClick = { showKarmaSheet = true },
                                         modifier = Modifier.weight(1f)
                                     )
                                     StatPill(
@@ -232,11 +243,20 @@ fun AccountPage(
                 }
 
                 item {
-                    Text(
-                        text = "Karma Reciprocity Ledger",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Karma Reciprocity Ledger",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        TextButton(onClick = { showKarmaSheet = true }) {
+                            Text("How it works ⓘ")
+                        }
+                    }
                 }
 
                 items(karmaLedger, key = { it.id }) { entry ->
@@ -395,12 +415,14 @@ private fun StatPill(
     label: String,
     value: String,
     subtitle: String? = null,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.primaryContainer)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {

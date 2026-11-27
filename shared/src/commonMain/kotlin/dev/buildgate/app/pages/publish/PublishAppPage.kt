@@ -49,6 +49,7 @@ import dev.buildgate.app.features.publishapp.DeepLinkSnippetLanguage
 import dev.buildgate.app.features.publishapp.PublishAppEvent
 import dev.buildgate.app.features.publishapp.PublishAppViewModel
 import dev.buildgate.app.shared.platform.PlatformVerifier
+import dev.buildgate.app.widgets.karma.KarmaExplainerSheet
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -68,6 +69,14 @@ fun PublishAppPage(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val platformVerifier: PlatformVerifier = koinInject()
+    var showKarmaSheet by remember { mutableStateOf(false) }
+
+    if (showKarmaSheet) {
+        KarmaExplainerSheet(
+            currentKarma = ownerKarma,
+            onDismiss = { showKarmaSheet = false }
+        )
+    }
 
     LaunchedEffect(editAppId) {
         if (!editAppId.isNullOrBlank()) {
@@ -100,11 +109,16 @@ fun PublishAppPage(
                             text = when {
                                 !isSignedIn -> "Sign in or create a free account to publish your closed-testing app"
                                 state.isEditMode -> "Update build version, links, or upgrade to Tier-2 Deep-Link Handshake"
-                                else -> "Your Karma ($ownerKarma ⚡) boosts your app's Discovery rank automatically"
+                                else -> "Free to publish • Your $ownerKarma ⚡ Karma gives a +${ownerKarma * 2} Discover boost"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { showKarmaSheet = true }) {
+                        Text("⚡ Karma ⓘ")
                     }
                 }
             )

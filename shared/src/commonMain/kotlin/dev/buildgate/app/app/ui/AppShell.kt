@@ -71,6 +71,7 @@ import dev.buildgate.app.shared.theme.BuildGateTheme
 import dev.buildgate.app.shared.theme.BuildGateThemeMode
 import dev.buildgate.app.shared.theme.BuildGateThemePreferences
 import dev.buildgate.app.shared.ui.BuildGateLogo
+import dev.buildgate.app.widgets.karma.KarmaExplainerSheet
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 
@@ -81,6 +82,7 @@ fun AppShell() {
         BuildGateTheme(themeMode = themeMode) {
             val navController = rememberNavController()
             var activeTabName by rememberSaveable { mutableStateOf(TopLevelTab.DISCOVERY.name) }
+            var showKarmaSheet by remember { mutableStateOf(false) }
             val activeTab = TopLevelTab.entries.find { it.name == activeTabName } ?: TopLevelTab.DISCOVERY
 
             val authViewModel: AuthViewModel = koinScopedViewModel()
@@ -393,6 +395,7 @@ fun AppShell() {
                             karmaPoints = authSession.profile?.karmaPoints ?: 0,
                             themeMode = themeMode,
                             onCycleTheme = { BuildGateThemePreferences.cycleThemeMode() },
+                            onOpenKarmaInfo = { showKarmaSheet = true },
                             onTabSelected = { onTabSelected(it) }
                         )
                         VerticalDivider(
@@ -422,6 +425,13 @@ fun AppShell() {
                     }
                 }
             }
+
+            if (showKarmaSheet) {
+                KarmaExplainerSheet(
+                    currentKarma = authSession.profile?.karmaPoints ?: 50,
+                    onDismiss = { showKarmaSheet = false }
+                )
+            }
         }
     }
 }
@@ -435,6 +445,7 @@ private fun DesktopBrandSidebar(
     karmaPoints: Int,
     themeMode: BuildGateThemeMode,
     onCycleTheme: () -> Unit,
+    onOpenKarmaInfo: () -> Unit,
     onTabSelected: (TopLevelTab) -> Unit
 ) {
     Surface(
@@ -560,11 +571,29 @@ private fun DesktopBrandSidebar(
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Text(
-                        text = if (isSignedIn) "⚡ $karmaPoints Karma" else "Click to Sign In",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isSignedIn) "⚡ $karmaPoints Karma" else "Click to Sign In",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (isSignedIn) {
+                            Text(
+                                text = "How? ⓘ",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(onClick = onOpenKarmaInfo)
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
