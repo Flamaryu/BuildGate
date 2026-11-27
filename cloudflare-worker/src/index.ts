@@ -258,7 +258,7 @@ function handlePrivacyPolicyPage(): Response {
         <li><strong>Step 2 Verification:</strong> Type <code>DELETE</code> to confirm and tap <em>Permanently Delete Account</em>.</li>
       </ol>
       <div class="danger">
-        <strong>What Is Permanently Deleted Immediately:</strong> Your authentication credentials, developer/tester profile, Karma balance &amp; ledger history, published app campaigns, QA missions, active/completed enrollments, daily verification logs, and submitted bug reports are immediately and irreversibly deleted via cascading database deletion. Any uploaded bug media files can also be purged upon request by emailing <a href="mailto:mkd-interactive.admin@gmail.com">mkd-interactive.admin@gmail.com</a>.
+        <strong>What Is Permanently Deleted Immediately:</strong> Your authentication credentials, developer/tester profile, Karma balance &amp; ledger history, published app campaigns, QA missions, active/completed enrollments, daily verification logs, and submitted bug reports are immediately and irreversibly deleted via cascading database deletion. Any uploaded bug media files can also be purged upon request by emailing <a href="mailto:support@buildgatehub.com">support@buildgatehub.com</a>.
       </div>
     </section>
 
@@ -269,7 +269,7 @@ function handlePrivacyPolicyPage(): Response {
 
     <section>
       <h2>6. Contact Us</h2>
-      <p>Questions, privacy requests, or manual data-deletion requests? Email us at <a href="mailto:mkd-interactive.admin@gmail.com">mkd-interactive.admin@gmail.com</a>.</p>
+      <p>Questions, privacy requests, or manual data-deletion requests? Email us at <a href="mailto:support@buildgatehub.com">support@buildgatehub.com</a>.</p>
     </section>
 
     <footer>
